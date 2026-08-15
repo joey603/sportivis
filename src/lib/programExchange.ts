@@ -17,7 +17,7 @@ const FORMAT_EXAMPLE = `{
 }`;
 
 export function buildFormatInstructions(): string {
-  return `Réponds UNIQUEMENT avec un bloc JSON valide, sans texte autour, exactement à ce format :
+  return `Réponds UNIQUEMENT avec un bloc de code JSON valide, sans texte autour, exactement à ce format :
 
 ${FORMAT_EXAMPLE}
 
@@ -25,7 +25,10 @@ Règles :
 - "exerciseId" doit être un identifiant repris de la colonne « id » de la liste ci-dessous, jamais un nom libre.
 - Exercice suivi en "reps" : utilise "reps". En "duree" : utilise "durationSec". En "distance" : utilise "distanceM".
 - "restSec" est le repos entre séries, en secondes.
-- Optionnels : "targetWeightKg" (charge visée), "workDurationSec" (temps d'effort chronométré par série), "notes".`;
+- Optionnels : "targetWeightKg" (charge visée), "workDurationSec" (temps d'effort chronométré par série), "notes".
+- Un seul objet JSON, du premier { au dernier }, sans commentaire.
+- Chaque nombre est une valeur unique, sans unité ni intervalle : écris 8 et non "8-12", 120 et non "120s".
+- Guillemets droits (") uniquement, jamais de guillemets typographiques.`;
 }
 
 export function buildExerciseCatalog(exercises: Exercise[]): string {
@@ -61,17 +64,242 @@ export type ImportResult =
   | { ok: true; program: ImportedProgram; warnings: string[] }
   | { ok: false; error: string };
 
-/** Retire les balises Markdown et le texte qui entoure éventuellement le JSON. */
-function extractJson(raw: string): string {
-  let text = raw.trim();
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) text = fenced[1].trim();
-  const start = text.search(/[[{]/);
-  if (start > 0) text = text.slice(start);
-  const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
-  if (end >= 0 && end < text.length - 1) text = text.slice(0, end + 1);
-  return text.trim();
+/* ------------------------------------------------------------------ */
+/* Lecture tolérante du JSON                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Un copier-coller depuis une conversation remplace souvent les guillemets
+ * droits par des guillemets typographiques et les espaces par des insécables,
+ * ce que JSON.parse refuse.
+ */
+function sanitizeCharacters(raw: string): string {
+  return raw
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, '')
+    .replace(/[\u00a0\u2007\u2009\u202f\u3000]/g, ' ')
+    .replace(/[\u201c\u201d\u201e\u201f\u2033]/g, '"')
+    .replace(/\r\n?/g, '\n');
 }
+
+type Segment = { isString: boolean; value: string };
+
+/**
+ * Découpe le texte en littéraux de chaîne et en code, commentaires retirés.
+ * Les corrections ne s'appliquent qu'au code : le contenu des chaînes (un nom
+ * d'exercice, une note) doit rester intact.
+ */
+function splitSegments(text: string): Segment[] {
+  const segments: Segment[] = [];
+  let code = '';
+  let index = 0;
+
+  while (index < text.length) {
+    const char = text[index];
+
+    if (char === '"') {
+      segments.push({ isString: false, value: code });
+      code = '';
+      let end = index + 1;
+      while (end < text.length) {
+        if (text[end] === '\\') {
+          end += 2;
+          continue;
+        }
+        end += 1;
+        if (text[end - 1] === '"') break;
+      }
+      segments.push({ isString: true, value: text.slice(index, end) });
+      index = end;
+      continue;
+    }
+
+    if (char === '/' && text[index + 1] === '/') {
+      const newline = text.indexOf('\n', index);
+      index = newline === -1 ? text.length : newline;
+      continue;
+    }
+
+    if (char === '/' && text[index + 1] === '*') {
+      const close = text.indexOf('*/', index + 2);
+      index = close === -1 ? text.length : close + 2;
+      continue;
+    }
+
+    code += char;
+    index += 1;
+  }
+
+  segments.push({ isString: false, value: code });
+  return segments;
+}
+
+const UNIT = 'secondes?|seconds?|secs?|s|kilos?|kgs?|kg|repetitions?|reps?|rep|metres?|meters?|m';
+const RANGE_SEPARATOR = '[-\u2013\u2014/x]|to|a|\u00e0|et|ou';
+
+function toDecimal(value: string): number {
+  return Number(value.replace(',', '.'));
+}
+
+function repairCode(chunk: string): string {
+  return (
+    chunk
+      .replace(/'([^'\n]*)'/g, '"$1"')
+      // Clés non citées, style objet JavaScript : { name: … }
+      .replace(/([{,]\s*)([A-Za-z_$][\w$]*)(\s*:)/g, '$1"$2"$3')
+      .replace(/\bTrue\b/g, 'true')
+      .replace(/\bFalse\b/g, 'false')
+      .replace(/\b(?:None|NaN|undefined|Infinity)\b/g, 'null')
+      // Intervalles « 8-12 », « 8 à 12 », « 3x10 » : on garde la première valeur.
+      .replace(
+        new RegExp(
+          `(\\d+(?:[.,]\\d+)?)\\s*(?:${RANGE_SEPARATOR})\\s*\\d+(?:[.,]\\d+)?`,
+          'gi',
+        ),
+        '$1',
+      )
+      // « 2 min » → 120 secondes.
+      .replace(/(\d+(?:[.,]\d+)?)\s*(?:min(?:ute)?s?|mn)\b/gi, (_match, value: string) =>
+        String(Math.round(toDecimal(value) * 60)),
+      )
+      // Unités restantes : « 90s », « 50 kg », « 12 reps ».
+      .replace(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(?:${UNIT})\\b`, 'gi'), '$1')
+      // Décimale à la virgule, en position de valeur uniquement.
+      .replace(/:(\s*)\+?(\d+),(\d+)/g, ':$1$2.$3')
+      .replace(/:(\s*)\+(\d)/g, ':$1$2')
+      .replace(/,(\s*[}\]])/g, '$1')
+      // Virgule oubliée entre deux entrées de la liste.
+      .replace(/}(\s*){/g, '},$1{')
+  );
+}
+
+/**
+ * Réassemble le texte en rétablissant au passage les séparateurs oubliés entre
+ * une valeur et le littéral suivant : « , » après une valeur, « : » après une
+ * clé. On suit pour cela le rôle du dernier littéral rencontré.
+ */
+function repairJson(text: string): string {
+  let result = '';
+  let lastStringWasValue = false;
+
+  for (const segment of splitSegments(text)) {
+    if (!segment.isString) {
+      result += repairCode(segment.value);
+      continue;
+    }
+
+    const tail = result.replace(/\s+$/, '');
+    if (/(?:[\d}\]]|true|false|null)$/.test(tail)) {
+      // En JSON valide une valeur ne peut être suivie que de « , », « } », « ] ».
+      result += ',';
+      lastStringWasValue = false;
+    } else if (tail.endsWith('"')) {
+      result += lastStringWasValue ? ',' : ':';
+      lastStringWasValue = !lastStringWasValue;
+    } else {
+      lastStringWasValue = tail.endsWith(':');
+    }
+
+    result += segment.value;
+  }
+
+  return result;
+}
+
+/** Isole la région allant de la première accolade à celle qui la referme. */
+function balancedRegion(text: string): { text: string; balanced: boolean } | undefined {
+  const start = text.search(/[[{]/);
+  if (start === -1) return undefined;
+
+  let depth = 0;
+  let inString = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (char === '\\') index += 1;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '{' || char === '[') depth += 1;
+    else if (char === '}' || char === ']') {
+      depth -= 1;
+      if (depth === 0) {
+        return { text: text.slice(start, index + 1), balanced: true };
+      }
+    }
+  }
+
+  return { text: text.slice(start), balanced: false };
+}
+
+/** Blocs candidats : chaque bloc de code d'abord, puis le texte entier. */
+function buildCandidates(text: string): { text: string; balanced: boolean }[] {
+  const candidates: { text: string; balanced: boolean }[] = [];
+  const seen = new Set<string>();
+
+  const sources = [
+    ...[...text.matchAll(/```[\w-]*\s*([\s\S]*?)(?:```|$)/g)].map((match) => match[1]),
+    text,
+  ];
+
+  for (const source of sources) {
+    const region = balancedRegion(source);
+    if (region && !seen.has(region.text)) {
+      seen.add(region.text);
+      candidates.push(region);
+    }
+  }
+
+  return candidates;
+}
+
+function describeSyntaxError(error: unknown, text: string): string {
+  const message = error instanceof Error ? error.message : '';
+  const position = Number(message.match(/position (\d+)/)?.[1]);
+  if (!Number.isFinite(position)) {
+    return 'JSON illisible : demande à ChatGPT de renvoyer uniquement le bloc JSON, sans texte autour.';
+  }
+
+  const before = text.slice(0, position);
+  const line = before.split('\n').length;
+  const source = text.split('\n')[line - 1]?.trim() ?? '';
+  const excerpt = source.length > 70 ? `${source.slice(0, 70)}…` : source;
+  return `JSON illisible ligne ${line}${excerpt ? ` : « ${excerpt} »` : ''}. Corrige cette ligne ou demande à ChatGPT de renvoyer le bloc en JSON strict.`;
+}
+
+function parseTolerant(input: string): { ok: true; data: unknown } | { ok: false; error: string } {
+  const sanitized = sanitizeCharacters(input);
+  const candidates = buildCandidates(sanitized);
+
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      error: 'Aucun bloc JSON trouvé : colle la réponse de ChatGPT, accolades comprises.',
+    };
+  }
+
+  let firstError: string | undefined;
+
+  for (const candidate of candidates) {
+    for (const attempt of [candidate.text, repairJson(candidate.text)]) {
+      try {
+        return { ok: true, data: JSON.parse(attempt) };
+      } catch (error) {
+        if (firstError === undefined || !candidate.balanced) {
+          firstError = candidate.balanced
+            ? describeSyntaxError(error, attempt)
+            : 'Le bloc collé est incomplet : la dernière accolade fermante manque. Recopie toute la réponse.';
+        }
+      }
+    }
+  }
+
+  return { ok: false, error: firstError ?? 'JSON illisible.' };
+}
+
+/* ------------------------------------------------------------------ */
+/* Interprétation du programme                                        */
+/* ------------------------------------------------------------------ */
 
 function normalize(value: string): string {
   return value
@@ -101,6 +329,7 @@ function pick(index: Map<string, unknown>, aliases: string[]): unknown {
 
 function toNumber(value: unknown): number | undefined {
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (Array.isArray(value)) return toNumber(value[0]);
   if (typeof value === 'string') {
     // « 8-12 reps » → 8 : on retient la première valeur de l'intervalle.
     const match = value.replace(',', '.').match(/\d+(\.\d+)?/);
@@ -148,46 +377,88 @@ const REFERENCE_KEYS = [
   'nomexercice',
 ];
 
+const LIST_KEYS = [
+  'exercises',
+  'exercices',
+  'items',
+  'program',
+  'programme',
+  'seance',
+  'seances',
+  'workout',
+  'workouts',
+  'days',
+  'jours',
+  'blocks',
+  'blocs',
+  'routine',
+];
+
+function looksLikeExercise(value: unknown): boolean {
+  if (typeof value === 'string') return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const index = keyIndex(value as Record<string, unknown>);
+  // Une entrée qui contient elle-même une liste est un regroupement (un jour…).
+  if (LIST_KEYS.some((key) => Array.isArray(index.get(key)))) return false;
+  return REFERENCE_KEYS.some((key) => index.get(key) !== undefined);
+}
+
+/**
+ * Cherche les listes d'exercices où qu'elles soient : ChatGPT imbrique souvent
+ * le programme sous une clé « programme », ou le découpe en journées.
+ */
+function collectExerciseLists(value: unknown, found: unknown[][], depth = 0): void {
+  if (depth > 6 || !value || typeof value !== 'object') return;
+
+  if (Array.isArray(value)) {
+    const matches = value.filter(looksLikeExercise).length;
+    if (matches > 0 && matches * 2 >= value.length) {
+      found.push(value);
+      return;
+    }
+    for (const item of value) collectExerciseLists(item, found, depth + 1);
+    return;
+  }
+
+  for (const child of Object.values(value)) {
+    collectExerciseLists(child, found, depth + 1);
+  }
+}
+
+function findText(value: unknown, aliases: string[], depth: number): string | undefined {
+  if (!value || typeof value !== 'object' || depth < 0) return undefined;
+  if (!Array.isArray(value)) {
+    if (looksLikeExercise(value)) return undefined;
+    const direct = toText(pick(keyIndex(value as Record<string, unknown>), aliases));
+    if (direct) return direct;
+  }
+  for (const child of Object.values(value)) {
+    const nested = findText(child, aliases, depth - 1);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
 export function parseProgramImport(input: string): ImportResult {
-  const text = extractJson(input);
-  if (!text) {
+  if (!input.trim()) {
     return { ok: false, error: 'Colle d’abord le programme reçu de ChatGPT.' };
   }
 
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return {
-      ok: false,
-      error:
-        'JSON illisible : vérifie que tout le bloc a été copié, accolades comprises.',
-    };
-  }
+  const parsed = parseTolerant(input);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
 
-  const root = Array.isArray(data)
-    ? { exercises: data }
-    : typeof data === 'object' && data
-      ? (data as Record<string, unknown>)
-      : null;
-  if (!root) {
+  const data = parsed.data;
+  if (!data || typeof data !== 'object') {
     return { ok: false, error: 'Le contenu collé n’est pas un programme.' };
   }
 
-  const rootIndex = keyIndex(root);
-  const rawList = pick(rootIndex, [
-    'exercises',
-    'exercices',
-    'items',
-    'program',
-    'programme',
-    'seance',
-    'workout',
-  ]);
-  if (!Array.isArray(rawList)) {
+  const lists: unknown[][] = [];
+  collectExerciseLists(data, lists);
+  if (lists.length === 0) {
     return {
       ok: false,
-      error: 'Aucune liste « exercises » trouvée dans le JSON.',
+      error:
+        'Aucune liste d’exercices trouvée : le JSON doit contenir un tableau « exercises ».',
     };
   }
 
@@ -195,7 +466,13 @@ export function parseProgramImport(input: string): ImportResult {
   const warnings: string[] = [];
   const exercises: ProgramExercise[] = [];
 
-  for (const raw of rawList) {
+  if (lists.length > 1) {
+    warnings.push(
+      `${lists.length} séances détectées : leurs exercices ont été réunis dans un seul programme.`,
+    );
+  }
+
+  for (const raw of lists.flat()) {
     const entry: Record<string, unknown> =
       typeof raw === 'string'
         ? { exerciseId: raw }
@@ -273,9 +550,11 @@ export function parseProgramImport(input: string): ImportResult {
     ok: true,
     warnings,
     program: {
-      name: toText(pick(rootIndex, ['name', 'nom', 'title', 'titre', 'programname'])),
-      description: toText(
-        pick(rootIndex, ['description', 'desc', 'objectif', 'goal', 'resume']),
+      name: findText(data, ['name', 'nom', 'title', 'titre', 'programname'], 2),
+      description: findText(
+        data,
+        ['description', 'desc', 'objectif', 'goal', 'resume'],
+        2,
       ),
       exercises,
     },

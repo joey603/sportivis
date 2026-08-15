@@ -56,8 +56,9 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
           <div>
             <h2>Importer un programme</h2>
             <p className="muted">
-              Colle la réponse JSON de ChatGPT : les exercices, séries, reps et
-              repos sont remplis automatiquement.
+              Colle la réponse de ChatGPT : les exercices, séries, reps et repos
+              sont remplis automatiquement. Le plus sûr est d’utiliser le bouton
+              « Copier » du bloc de code, pour n’oublier aucune accolade.
             </p>
           </div>
         </div>
