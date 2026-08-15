@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
+import { ImportProgram } from '../components/ImportProgram';
+import type { ImportedProgram } from '../lib/programExchange';
 import {
   createId,
   exerciseWorkSeconds,
@@ -37,6 +39,7 @@ export function ProgramEditor() {
     return loadData().programs.find((p) => p.id === id) ?? null;
   });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -104,6 +107,26 @@ export function ProgramEditor() {
       p ? { ...p, exercises: [...p.exercises, pe] } : p,
     );
     setPickerOpen(false);
+    setSaved(false);
+  }
+
+  function applyImport(
+    imported: ImportedProgram,
+    mode: 'replace' | 'append',
+  ) {
+    setProgram((p) => {
+      if (!p) return p;
+      return {
+        ...p,
+        // Le nom et la description ne sont écrasés que si l'import en fournit.
+        name: imported.name ?? p.name,
+        description: imported.description ?? p.description,
+        exercises:
+          mode === 'append'
+            ? [...p.exercises, ...imported.exercises]
+            : imported.exercises,
+      };
+    });
     setSaved(false);
   }
 
@@ -175,17 +198,29 @@ export function ProgramEditor() {
         <h2 style={{ fontSize: '1.15rem' }}>
           Exercices ({program.exercises.length})
         </h2>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={() => setPickerOpen(true)}
-        >
-          + Ajouter
-        </button>
+        <div className="row-actions">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setPickerOpen(true)}
+          >
+            + Ajouter
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setImportOpen(true)}
+          >
+            Importer (ChatGPT)
+          </button>
+        </div>
       </div>
 
       {program.exercises.length === 0 && (
-        <p className="empty">Ajoute des exercices depuis la bibliothèque.</p>
+        <p className="empty">
+          Ajoute des exercices depuis la bibliothèque, ou colle un programme
+          généré par ChatGPT avec « Importer ».
+        </p>
       )}
 
       {program.exercises.map((pe, index) => {
@@ -379,6 +414,14 @@ export function ProgramEditor() {
         <ExercisePicker
           onPick={addExercise}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {importOpen && (
+        <ImportProgram
+          currentCount={program.exercises.length}
+          onImport={applyImport}
+          onClose={() => setImportOpen(false)}
         />
       )}
 

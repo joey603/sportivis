@@ -6,11 +6,13 @@ import {
 } from '../components/ExerciseFilters';
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
+import { ExportExercises } from '../components/ExportExercises';
 import { getAllExercises } from '../lib/storage';
 
 export function Exercises() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [libraryVersion, setLibraryVersion] = useState(0);
   const filters = useExerciseFilters(libraryVersion);
   const { results } = filters;
@@ -28,13 +30,22 @@ export function Exercises() {
             les consignes.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setCreateOpen(true)}
-        >
-          + Ajouter mon exercice
-        </button>
+        <div className="row-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+          >
+            + Ajouter mon exercice
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setExportOpen(true)}
+          >
+            Exporter les exercices
+          </button>
+        </div>
       </header>
 
       <ExerciseFilters {...filters} />
@@ -76,6 +87,14 @@ export function Exercises() {
 
       {openId && (
         <ExerciseSheet exerciseId={openId} onClose={() => setOpenId(null)} />
+      )}
+
+      {/* On exporte la sélection affichée : les filtres actifs restreignent la liste. */}
+      {exportOpen && (
+        <ExportExercises
+          exercises={results}
+          onClose={() => setExportOpen(false)}
+        />
       )}
 
       {createOpen && (
