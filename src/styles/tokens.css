@@ -43,6 +43,9 @@ html {
 
 body {
   margin: 0;
+  /* Rendu « application » : pas de rebond élastique ni de flash bleu au toucher. */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
   font-family: var(--font);
   color: var(--text);
   background:
@@ -101,20 +104,23 @@ ul {
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
+/* En application installée, la barre passe sous l'encoche : sa hauteur et son
+   fond intègrent la zone sûre du haut. */
 .top-nav {
   position: sticky;
   top: 0;
   z-index: 50;
-  height: var(--nav-h);
+  height: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0 1.25rem;
+  padding: env(safe-area-inset-top, 0px) max(1.25rem, env(safe-area-inset-right, 0px))
+    0 max(1.25rem, env(safe-area-inset-left, 0px));
   backdrop-filter: blur(16px);
   background: rgba(10, 22, 40, 0.75);
   border-bottom: 1px solid var(--border);
@@ -252,7 +258,9 @@ ul {
     align-items: stretch;
     justify-content: flex-start;
     gap: 0.35rem;
-    padding: calc(var(--nav-h) + 0.75rem) 1rem 1.5rem;
+    padding: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 0.75rem)
+      max(1rem, env(safe-area-inset-right, 0px))
+      calc(1.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -296,7 +304,9 @@ ul {
   width: 100%;
   max-width: 960px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  padding: 1.5rem max(1.25rem, env(safe-area-inset-right, 0px))
+    calc(3rem + env(safe-area-inset-bottom, 0px))
+    max(1.25rem, env(safe-area-inset-left, 0px));
 }
 
 .page-header {
@@ -333,6 +343,15 @@ ul {
 
 .btn:active {
   transform: scale(0.98);
+}
+
+/* Un appui long sur une commande ne doit pas déclencher la sélection de texte. */
+.btn,
+.nav-links a,
+.nav-toggle,
+.carousel-dot {
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .btn-primary {
@@ -633,7 +652,7 @@ ul {
 
 .rest-timer {
   position: sticky;
-  bottom: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   margin-top: 1rem;
   padding: 1rem 1.25rem;
   border-radius: var(--radius);
@@ -706,7 +725,7 @@ ul {
 }
 
 .auth-page {
-  min-height: calc(100vh - var(--nav-h) - 4.5rem);
+  min-height: calc(100dvh - var(--nav-h) - 4.5rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1533,7 +1552,9 @@ ul {
   }
 
   .main {
-    padding: 1.15rem 1rem 2.5rem;
+    padding: 1.15rem max(1rem, env(safe-area-inset-right, 0px))
+      calc(2.5rem + env(safe-area-inset-bottom, 0px))
+      max(1rem, env(safe-area-inset-left, 0px));
   }
 
   .panel {
@@ -1584,7 +1605,7 @@ ul {
   .modal {
     max-width: none;
     max-height: 92dvh;
-    padding: 1.1rem 1rem 1.25rem;
+    padding: 1.1rem 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
     border-radius: var(--radius) var(--radius) 0 0;
   }
 
