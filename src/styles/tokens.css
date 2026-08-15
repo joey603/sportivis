@@ -809,6 +809,92 @@ ul {
   color: var(--text-muted);
 }
 
+.incoming-programs {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.incoming-programs-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.incoming-programs-heading h2 {
+  margin-top: 0.45rem;
+  font-size: 1.25rem;
+}
+
+.shared-program-card {
+  border: 2px dashed var(--accent);
+  background:
+    linear-gradient(rgba(184, 242, 85, 0.035), rgba(184, 242, 85, 0.035)),
+    var(--surface);
+}
+
+.shared-program-sender {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shared-program-preview {
+  max-width: 620px;
+}
+
+.shared-program-preview .sheet-head h2 {
+  margin-top: 0.65rem;
+}
+
+.shared-exercise-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.shared-exercise-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.shared-exercise-row p {
+  margin-top: 0.2rem;
+  font-size: 0.84rem;
+}
+
+.shared-exercise-index {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.shared-exercise-note {
+  color: var(--text);
+}
+
+.shared-program-actions {
+  position: sticky;
+  bottom: 0;
+  padding-top: 0.75rem;
+  background: linear-gradient(transparent, var(--bg) 25%);
+}
+
 .editor-ex {
   display: grid;
   gap: 0.75rem;
@@ -1648,6 +1734,16 @@ ul {
   .page-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .incoming-programs-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .shared-program-card .row-actions .btn,
+  .shared-program-actions .btn {
+    flex: 1;
   }
 
   .dashboard-header .btn,

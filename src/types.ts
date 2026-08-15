@@ -62,6 +62,15 @@ export type Program = {
   updatedAt: string;
 };
 
+export type ProgramShare = {
+  id: string;
+  senderName: string;
+  program: Program;
+  /** Exercices personnels embarqués pour pouvoir afficher puis accepter l’aperçu. */
+  customExercises: Exercise[];
+  createdAt: string;
+};
+
 export type SetLog = {
   setIndex: number;
   completed: boolean;
@@ -104,4 +113,5 @@ export type AppData = {
   customExercises: Exercise[];
   profile?: UserProfile;
   weightEntries: WeightEntry[];
+  incomingProgramShares: ProgramShare[];
 };

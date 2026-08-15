@@ -2,6 +2,7 @@ import type {
   AppData,
   Exercise,
   Program,
+  ProgramShare,
   Session,
   UserProfile,
   WeightEntry,
@@ -49,6 +50,34 @@ type WeightEntryRow = {
   recorded_at: string;
 };
 
+type ProgramShareRow = {
+  id: string;
+  source_program_id: string;
+  sender_name: string;
+  program_name: string;
+  program_description: string | null;
+  exercises: Program['exercises'];
+  custom_exercises: Exercise[];
+  created_at: string;
+};
+
+function mapProgramShares(rows: ProgramShareRow[]): ProgramShare[] {
+  return rows.map((row) => ({
+    id: row.id,
+    senderName: row.sender_name,
+    program: {
+      id: row.source_program_id,
+      name: row.program_name,
+      description: row.program_description ?? undefined,
+      exercises: row.exercises ?? [],
+      createdAt: row.created_at,
+      updatedAt: row.created_at,
+    },
+    customExercises: row.custom_exercises ?? [],
+    createdAt: row.created_at,
+  }));
+}
+
 function requireClient() {
   if (!supabase) throw new Error('Supabase non configuré');
   return supabase;
@@ -56,13 +85,20 @@ function requireClient() {
 
 export async function fetchCloudData(): Promise<AppData> {
   const client = requireClient();
-  const [programsRes, sessionsRes, customRes, profileRes, weightsRes] =
+  const [programsRes, sessionsRes, customRes, profileRes, weightsRes, sharesRes] =
     await Promise.all([
     client.from('programs').select('*').order('updated_at', { ascending: false }),
     client.from('sessions').select('*').order('started_at', { ascending: false }),
     client.from('custom_exercises').select('*').order('created_at', { ascending: false }),
     client.from('profiles').select('first_name,last_name,age').maybeSingle(),
     client.from('weight_entries').select('*').order('recorded_at', { ascending: true }),
+    client
+      .from('program_shares')
+      .select(
+        'id,source_program_id,sender_name,program_name,program_description,exercises,custom_exercises,created_at',
+      )
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false }),
   ]);
 
   if (programsRes.error) throw programsRes.error;
@@ -70,6 +106,10 @@ export async function fetchCloudData(): Promise<AppData> {
   if (customRes.error) throw customRes.error;
   if (profileRes.error) throw profileRes.error;
   if (weightsRes.error) throw weightsRes.error;
+  // Permet de déployer le client avant d’exécuter la migration de partage.
+  const sharingUnavailable =
+    sharesRes.error?.code === '42P01' || sharesRes.error?.code === 'PGRST205';
+  if (sharesRes.error && !sharingUnavailable) throw sharesRes.error;
 
   const programs = (programsRes.data as ProgramRow[]).map((row) => ({
     id: row.id,
@@ -114,8 +154,18 @@ export async function fetchCloudData(): Promise<AppData> {
     weightKg: Number(row.weight_kg),
     recordedAt: row.recorded_at,
   }));
+  const incomingProgramShares: ProgramShare[] = sharingUnavailable
+    ? []
+    : mapProgramShares((sharesRes.data ?? []) as ProgramShareRow[]);
 
-  return { programs, sessions, customExercises, profile, weightEntries };
+  return {
+    programs,
+    sessions,
+    customExercises,
+    profile,
+    weightEntries,
+    incomingProgramShares,
+  };
 }
 
 export async function pushAllData(data: AppData, userId: string): Promise<void> {
@@ -264,6 +314,43 @@ export async function deleteSessionCloud(id: string): Promise<void> {
   const client = requireClient();
   const { error } = await client.from('sessions').delete().eq('id', id);
   if (error) throw error;
+}
+
+export async function shareProgramCloud(
+  programId: string,
+  recipientEmail: string,
+): Promise<void> {
+  const client = requireClient();
+  const { error } = await client.rpc('share_program_with_email', {
+    p_program_id: programId,
+    p_recipient_email: recipientEmail.trim().toLowerCase(),
+  });
+  if (error) throw error;
+}
+
+export async function respondToProgramShareCloud(
+  shareId: string,
+  accept: boolean,
+): Promise<void> {
+  const client = requireClient();
+  const { error } = await client.rpc('respond_to_program_share', {
+    p_share_id: shareId,
+    p_accept: accept,
+  });
+  if (error) throw error;
+}
+
+export async function fetchIncomingProgramSharesCloud(): Promise<ProgramShare[]> {
+  const client = requireClient();
+  const { data, error } = await client
+    .from('program_shares')
+    .select(
+      'id,source_program_id,sender_name,program_name,program_description,exercises,custom_exercises,created_at',
+    )
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return mapProgramShares((data ?? []) as ProgramShareRow[]);
 }
 
 export async function upsertCustomExerciseCloud(

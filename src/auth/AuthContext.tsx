@@ -97,7 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           cloud.sessions.length > 0 ||
           cloud.customExercises.length > 0 ||
           Boolean(cloud.profile) ||
-          cloud.weightEntries.length > 0;
+          cloud.weightEntries.length > 0 ||
+          cloud.incomingProgramShares.length > 0;
         if (hasCloud) {
           saveData(cloud);
           const latestWeight = cloud.weightEntries.at(-1);

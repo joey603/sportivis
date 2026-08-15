@@ -15,6 +15,7 @@ Ouvre l’URL affichée (souvent http://localhost:5173).
 
 - Bibliothèque d’exercices filtrable (photos libres)
 - Programmes avec séries, reps / durée / distance, repos, temps d’effort et charge
+- Partage privé d’un programme à un autre compte avec aperçu, acceptation ou refus
 - Séance live avec enchaînement auto effort → repos → exercice suivant
 - Historique local + export / import JSON
 - Synchronisation cloud optionnelle via Supabase
@@ -38,7 +39,7 @@ VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 ```
 
-4. Dans le dashboard Supabase → **SQL Editor**, exécute tout le contenu de [`supabase/schema.sql`](supabase/schema.sql) (tables + Row Level Security).
+4. Dans le dashboard Supabase → **SQL Editor**, exécute tout le contenu de [`supabase/schema.sql`](supabase/schema.sql), puis [`supabase/program_sharing.sql`](supabase/program_sharing.sql) (tables, fonctions et Row Level Security).
 5. Dans **Authentication → Providers → Email**, laisse Email activé et désactive « Confirm email » pour connecter immédiatement les utilisateurs avec leur email et leur mot de passe.
 6. Relance `npm run dev`, ouvre **Connexion**, crée un compte / connecte-toi.
 

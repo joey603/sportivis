@@ -119,6 +119,7 @@ function defaultData(): AppData {
     sessions: [],
     customExercises: [],
     weightEntries: [],
+    incomingProgramShares: [],
   };
 }
 
@@ -137,6 +138,7 @@ export function loadData(): AppData {
       customExercises: parsed.customExercises ?? [],
       profile: parsed.profile,
       weightEntries: parsed.weightEntries ?? [],
+      incomingProgramShares: parsed.incomingProgramShares ?? [],
     };
   } catch {
     return defaultData();
@@ -215,6 +217,7 @@ export function importData(json: string): AppData {
     customExercises: parsed.customExercises ?? [],
     profile: parsed.profile,
     weightEntries: parsed.weightEntries ?? [],
+    incomingProgramShares: parsed.incomingProgramShares ?? [],
   };
   saveData(data);
   return data;
