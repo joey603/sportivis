@@ -97,15 +97,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const description = readString(body, 'description', 600);
     if (description.length < 3) throw new HttpError(400, 'description_required');
     const clarifications = readClarifications(body.clarifications);
+    const assumeTypical = body.assumeTypical === true;
 
     const remaining = await consumeQuota(token, 'meal');
 
     const raw = await generateJson<RawMeal>({
       systemInstruction:
         locale === 'he'
-          ? 'אתה תזונאי מדויק. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים תזונתיים. כשיש אי-בהירות (כמויות חסרות, שתי חלבונים זה לצד זה, ניסוח דו-משמעי) אתה שואל שאלות קצרות עם אפשרויות במקום לנחש.'
-          : "Tu es nutritionniste précis. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros. En cas d'ambiguïté (quantités manquantes, deux protéines côte à côte, formulation douteuse), tu poses des questions courtes à choix plutôt que de fusionner ou d'inventer.",
-      prompt: buildPrompt(locale, description, clarifications),
+          ? assumeTypical
+            ? 'אתה תזונאי. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים לפי מנה רגילה/טיפוסית. אל תשאל שאלות — תמיד החזר status = "ready".'
+            : 'אתה תזונאי מדויק. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים תזונתיים. כשיש אי-בהירות (כמויות חסרות, שתי חלבונים זה לצד זה, ניסוח דו-משמעי) אתה שואל שאלות קצרות עם אפשרויות במקום לנחש.'
+          : assumeTypical
+            ? 'Tu es nutritionniste. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros avec des portions normales / typiques. Ne pose aucune question — renvoie toujours status = "ready".'
+            : "Tu es nutritionniste précis. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros. En cas d'ambiguïté (quantités manquantes, deux protéines côte à côte, formulation douteuse), tu poses des questions courtes à choix plutôt que de fusionner ou d'inventer.",
+      prompt: buildPrompt(locale, description, clarifications, assumeTypical),
       schema: MEAL_SCHEMA,
       schemaName: 'meal_analysis',
       purpose: 'meal',
@@ -113,8 +118,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
 
     const status =
-      raw.status === 'needs_clarification' ? 'needs_clarification' : 'ready';
-    const questions = normalizeQuestions(raw.questions);
+      assumeTypical
+        ? 'ready'
+        : raw.status === 'needs_clarification'
+          ? 'needs_clarification'
+          : 'ready';
+    const questions = assumeTypical ? [] : normalizeQuestions(raw.questions);
 
     // Si le modèle demande des précisions mais n’en fournit aucune, on force ready.
     if (status === 'needs_clarification' && questions.length > 0 && !clarifications) {
@@ -154,6 +163,7 @@ function buildPrompt(
   locale: Locale,
   description: string,
   clarifications: string,
+  assumeTypical: boolean,
 ): string {
   const clarificationBlock = clarifications
     ? locale === 'he'
@@ -162,6 +172,26 @@ function buildPrompt(
     : '';
 
   if (locale === 'he') {
+    if (assumeTypical) {
+      return `נתח את הארוחה הבאה ללא שאלות הבהרה.
+
+תיאור הארוחה: « ${description} »
+${clarificationBlock}
+המשתמש בחר « הוסף בלי דיוק »: עליך להעריך מנה רגילה/טיפוסית של כל מזון.
+
+כללי פירוק (קריטיים):
+- כל מזון שמוזכר הוא פריט נפרד, אלא אם המשתמש אמר במפורש מנה מורכבת אחת.
+- « ביצים ועוף וסלט » = 3 פריטים נפרדים. לעולם אל תמזג.
+- מוצר מותג אחד = פריט אחד.
+- אל תוסיף מזונות שלא הוזכרו.
+
+חובה:
+- status = "ready" תמיד (אסור "needs_clarification").
+- "questions" = [].
+- מלא "items" עם name / quantity / kcal / proteinG / carbsG / fatG.
+- ב-"quantity" כתוב במפורש את ההנחה (למשל « מנה רגילה ~150 ג׳ », « 2 ביצים גדולות »).`;
+    }
+
     return `נתח את הארוחה הבאה.
 
 תיאור הארוחה: « ${description} »
@@ -183,6 +213,26 @@ ${clarificationBlock}
 - מלא "items" עם name / quantity / kcal / proteinG / carbsG / fatG.
 - כבד כמויות וגדלים (« מיני », « קטן », גרמים…). אם לא צוין, הנח מנה רגילה וכתוב אותה ב-"quantity".
 - "questions" חייב להיות מערך ריק [].`;
+  }
+
+  if (assumeTypical) {
+    return `Analyse le repas suivant SANS poser de questions.
+
+Description du repas : « ${description} »
+${clarificationBlock}
+L'utilisateur a choisi « Ajoute sans précision » : tu dois estimer une portion normale / typique pour chaque aliment.
+
+Règles de décomposition (critiques) :
+- Chaque aliment mentionné = un item SÉPARÉ, sauf plat composé clairement décrit.
+- « œufs, poulet et salade » = 3 items distincts. Ne fusionne JAMAIS.
+- Un produit de marque = UN item.
+- N'ajoute aucun aliment non mentionné.
+
+Obligatoire :
+- status = "ready" toujours (interdit "needs_clarification") ;
+- "questions" = [] ;
+- remplis "items" (name / quantity / kcal / proteinG / carbsG / fatG) ;
+- dans "quantity", écris explicitement l'hypothèse (ex. « portion normale ~150 g », « 2 œufs moyens »).`;
   }
 
   return `Analyse le repas suivant.

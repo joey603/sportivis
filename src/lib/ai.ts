@@ -116,11 +116,13 @@ export async function analyzeMealAi(
   description: string,
   locale: Locale,
   clarifications?: MealClarificationAnswer[],
+  options?: { assumeTypical?: boolean },
 ): Promise<AnalyzeMealResult> {
   return post<AnalyzeMealResult>('/api/analyze-meal', {
     description,
     locale,
     clarifications: clarifications?.length ? clarifications : undefined,
+    assumeTypical: options?.assumeTypical === true ? true : undefined,
   });
 }
 
