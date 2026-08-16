@@ -93,14 +93,49 @@ export type AnalyzedMeal = {
   items: MealItem[];
 };
 
+export type MealClarifyingQuestion = {
+  id: string;
+  prompt: string;
+  options: string[];
+};
+
+export type MealClarificationAnswer = {
+  prompt: string;
+  answer: string;
+};
+
+export type AnalyzeMealResult =
+  | { status: 'ready'; meal: AnalyzedMeal; remaining: number }
+  | {
+      status: 'needs_clarification';
+      questions: MealClarifyingQuestion[];
+      remaining: number;
+    };
+
 export async function analyzeMealAi(
   description: string,
   locale: Locale,
-): Promise<{ meal: AnalyzedMeal; remaining: number }> {
-  return post<{ meal: AnalyzedMeal; remaining: number }>('/api/analyze-meal', {
+  clarifications?: MealClarificationAnswer[],
+): Promise<AnalyzeMealResult> {
+  return post<AnalyzeMealResult>('/api/analyze-meal', {
     description,
     locale,
+    clarifications: clarifications?.length ? clarifications : undefined,
   });
+}
+
+/** Recalcule les totaux après édition manuelle des items. */
+export function totalsFromMealItems(items: MealItem[]): Omit<AnalyzedMeal, 'label' | 'items'> {
+  return {
+    kcal: Math.round(items.reduce((sum, item) => sum + item.kcal, 0)),
+    proteinG: round1(items.reduce((sum, item) => sum + item.proteinG, 0)),
+    carbsG: round1(items.reduce((sum, item) => sum + item.carbsG, 0)),
+    fatG: round1(items.reduce((sum, item) => sum + item.fatG, 0)),
+  };
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 /** Solde d'appels restant aujourd'hui, ou null si l'info est indisponible. */

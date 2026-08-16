@@ -6,7 +6,10 @@ import {
   aiErrorCode,
   aiErrorMessage,
   analyzeMealAi,
+  totalsFromMealItems,
   type AnalyzedMeal,
+  type MealClarificationAnswer,
+  type MealClarifyingQuestion,
 } from '../lib/ai';
 import { loadSettings } from '../lib/calories';
 import {
@@ -19,7 +22,7 @@ import {
 import { addMeal, deleteMeal, mealsOfDay, saveProfile } from '../lib/storage';
 import { useAppData } from '../lib/useAppData';
 import type { MessageKey } from '../i18n/messages';
-import type { NutritionGoal } from '../types';
+import type { MealItem, NutritionGoal } from '../types';
 
 /** Titre déduit de l'heure du repas, indépendant de la langue. */
 function mealTimeKey(eatenAt: string): MessageKey {
@@ -37,6 +40,8 @@ export function Nutrition() {
   const [busy, setBusy] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzedMeal | null>(null);
+  const [questions, setQuestions] = useState<MealClarifyingQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [goal, setGoal] = useState<NutritionGoal | ''>(
     data.profile?.goal ?? '',
   );
@@ -79,11 +84,23 @@ export function Nutrition() {
     minute: '2-digit',
   });
 
-  async function analyze() {
+  async function analyze(clarifications?: MealClarificationAnswer[]) {
     setBusy(true);
     setErrorCode(null);
     try {
-      const result = await analyzeMealAi(description.trim(), locale);
+      const result = await analyzeMealAi(
+        description.trim(),
+        locale,
+        clarifications,
+      );
+      if (result.status === 'needs_clarification') {
+        setAnalysis(null);
+        setQuestions(result.questions);
+        setAnswers({});
+        return;
+      }
+      setQuestions([]);
+      setAnswers({});
       setAnalysis(result.meal);
     } catch (reason) {
       setErrorCode(aiErrorCode(reason));
@@ -92,21 +109,82 @@ export function Nutrition() {
     }
   }
 
+  function submitClarifications() {
+    const clarifications: MealClarificationAnswer[] = questions
+      .map((question) => ({
+        prompt: question.prompt,
+        answer: answers[question.id]?.trim() ?? '',
+      }))
+      .filter((entry) => entry.answer);
+    if (clarifications.length !== questions.length) {
+      setErrorCode('clarification_required');
+      return;
+    }
+    void analyze(clarifications);
+  }
+
+  function updateItem(index: number, patch: Partial<MealItem>) {
+    setAnalysis((current) => {
+      if (!current) return current;
+      const items = current.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item,
+      );
+      return { ...current, items, ...totalsFromMealItems(items) };
+    });
+  }
+
+  function removeItem(index: number) {
+    setAnalysis((current) => {
+      if (!current) return current;
+      const items = current.items.filter((_, itemIndex) => itemIndex !== index);
+      return { ...current, items, ...totalsFromMealItems(items) };
+    });
+  }
+
+  function addEmptyItem() {
+    setAnalysis((current) => {
+      if (!current) return current;
+      const items = [
+        ...current.items,
+        {
+          name: '',
+          quantity: '',
+          kcal: 0,
+          proteinG: 0,
+          carbsG: 0,
+          fatG: 0,
+        },
+      ];
+      return { ...current, items, ...totalsFromMealItems(items) };
+    });
+  }
+
   function save() {
     if (!analysis) return;
+    const items = analysis.items.filter((item) => item.name.trim());
+    if (!items.length) {
+      setErrorCode('clarification_required');
+      return;
+    }
+    const totals = totalsFromMealItems(items);
     setData(
       addMeal({
-        label: analysis.label,
-        kcal: analysis.kcal,
-        proteinG: analysis.proteinG,
-        carbsG: analysis.carbsG,
-        fatG: analysis.fatG,
-        items: analysis.items,
+        label: analysis.label.trim() || description.trim().slice(0, 60),
+        ...totals,
+        items,
         eatenAt: new Date().toISOString(),
       }),
     );
     setAnalysis(null);
+    setQuestions([]);
+    setAnswers({});
     setDescription('');
+  }
+
+  function discardAnalysis() {
+    setAnalysis(null);
+    setQuestions([]);
+    setAnswers({});
   }
 
   function remove(id: string) {
@@ -347,6 +425,9 @@ export function Nutrition() {
             onChange={(event) => {
               setDescription(event.target.value);
               setErrorCode(null);
+              setQuestions([]);
+              setAnswers({});
+              setAnalysis(null);
             }}
             placeholder={t('nutrition.placeholder')}
           />
@@ -368,28 +449,203 @@ export function Nutrition() {
         </div>
       </section>
 
+      {questions.length > 0 && (
+        <section className="panel meal-clarify">
+          <div className="sheet-head">
+            <div>
+              <h2>{t('nutrition.clarifyTitle')}</h2>
+              <p className="muted">{t('nutrition.clarifyHint')}</p>
+            </div>
+          </div>
+
+          <div className="meal-clarify-list">
+            {questions.map((question) => (
+              <fieldset key={question.id} className="meal-clarify-question">
+                <legend>{question.prompt}</legend>
+                <div className="meal-clarify-options">
+                  {question.options.map((option) => {
+                    const selected = answers[question.id] === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          selected
+                            ? 'btn btn-secondary btn-sm'
+                            : 'btn btn-ghost btn-sm'
+                        }
+                        onClick={() => {
+                          setAnswers((current) => ({
+                            ...current,
+                            [question.id]: option,
+                          }));
+                          setErrorCode(null);
+                        }}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+
+          <div className="row-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={submitClarifications}
+            >
+              {busy ? t('nutrition.analyzing') : t('nutrition.clarifySubmit')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={discardAnalysis}
+            >
+              {t('nutrition.discard')}
+            </button>
+          </div>
+        </section>
+      )}
+
       {analysis && (
         <section className="panel meal-analysis">
           <div className="sheet-head">
             <div>
-              <h2>{analysis.label}</h2>
-              <p className="muted">{t('nutrition.estimateHint')}</p>
+              <h2>{t('nutrition.estimate')}</h2>
+              <p className="muted">{t('nutrition.editHint')}</p>
             </div>
             <strong className="meal-kcal">
               {numberFormat.format(analysis.kcal)} {t('units.kcal')}
             </strong>
           </div>
 
-          <ul className="meal-items">
+          <div className="field">
+            <label htmlFor="meal-label">{t('nutrition.mealLabel')}</label>
+            <input
+              id="meal-label"
+              value={analysis.label}
+              onChange={(event) =>
+                setAnalysis((current) =>
+                  current
+                    ? { ...current, label: event.target.value.slice(0, 60) }
+                    : current,
+                )
+              }
+            />
+          </div>
+
+          <ul className="meal-items meal-items-edit">
             {analysis.items.map((item, index) => (
-              <li key={`${item.name}-${index}`}>
-                <span>{item.name}</span>
-                <span className="muted">
-                  {t('nutrition.itemQuantity', {
-                    quantity: item.quantity,
-                    kcal: numberFormat.format(item.kcal),
-                  })}
-                </span>
+              <li key={`edit-${index}`}>
+                <div className="meal-item-edit-grid">
+                  <div className="field">
+                    <label htmlFor={`item-name-${index}`}>
+                      {t('nutrition.itemName')}
+                    </label>
+                    <input
+                      id={`item-name-${index}`}
+                      value={item.name}
+                      onChange={(event) =>
+                        updateItem(index, {
+                          name: event.target.value.slice(0, 80),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`item-qty-${index}`}>
+                      {t('nutrition.itemQty')}
+                    </label>
+                    <input
+                      id={`item-qty-${index}`}
+                      value={item.quantity}
+                      onChange={(event) =>
+                        updateItem(index, {
+                          quantity: event.target.value.slice(0, 40),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`item-kcal-${index}`}>
+                      {t('units.kcal')}
+                    </label>
+                    <input
+                      id={`item-kcal-${index}`}
+                      type="number"
+                      min={0}
+                      value={item.kcal}
+                      onChange={(event) =>
+                        updateItem(index, {
+                          kcal: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`item-protein-${index}`}>
+                      {t('nutrition.protein')}
+                    </label>
+                    <input
+                      id={`item-protein-${index}`}
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={item.proteinG}
+                      onChange={(event) =>
+                        updateItem(index, {
+                          proteinG: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`item-carbs-${index}`}>
+                      {t('nutrition.carbs')}
+                    </label>
+                    <input
+                      id={`item-carbs-${index}`}
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={item.carbsG}
+                      onChange={(event) =>
+                        updateItem(index, {
+                          carbsG: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`item-fat-${index}`}>
+                      {t('nutrition.fat')}
+                    </label>
+                    <input
+                      id={`item-fat-${index}`}
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={item.fatG}
+                      onChange={(event) =>
+                        updateItem(index, {
+                          fatG: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => removeItem(index)}
+                >
+                  {t('nutrition.removeItem')}
+                </button>
               </li>
             ))}
           </ul>
@@ -404,13 +660,20 @@ export function Nutrition() {
           </p>
 
           <div className="row-actions">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={addEmptyItem}
+            >
+              {t('nutrition.addItem')}
+            </button>
             <button type="button" className="btn btn-primary" onClick={save}>
               {t('nutrition.add')}
             </button>
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => setAnalysis(null)}
+              onClick={discardAnalysis}
             >
               {t('nutrition.discard')}
             </button>

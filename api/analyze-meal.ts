@@ -23,6 +23,10 @@ export const config = { maxDuration: 30 };
 const MEAL_SCHEMA: JsonSchema = {
   type: 'object',
   properties: {
+    status: {
+      type: 'string',
+      description: 'ready si l’analyse est claire, needs_clarification sinon',
+    },
     label: {
       type: 'string',
       description: 'Nom court du repas, 40 caractères maximum',
@@ -45,11 +49,27 @@ const MEAL_SCHEMA: JsonSchema = {
         required: ['name', 'quantity', 'kcal', 'proteinG', 'carbsG', 'fatG'],
       },
     },
+    questions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          prompt: { type: 'string' },
+          options: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+        required: ['id', 'prompt', 'options'],
+      },
+    },
   },
-  required: ['label', 'items'],
+  required: ['status', 'label', 'items', 'questions'],
 };
 
 type RawMeal = {
+  status?: string;
   label?: string;
   items?: {
     name?: string;
@@ -58,6 +78,11 @@ type RawMeal = {
     proteinG?: number;
     carbsG?: number;
     fatG?: number;
+  }[];
+  questions?: {
+    id?: string;
+    prompt?: string;
+    options?: unknown;
   }[];
 };
 
@@ -71,57 +96,116 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const locale: Locale = body.locale === 'he' ? 'he' : 'fr';
     const description = readString(body, 'description', 600);
     if (description.length < 3) throw new HttpError(400, 'description_required');
+    const clarifications = readClarifications(body.clarifications);
 
     const remaining = await consumeQuota(token, 'meal');
 
     const raw = await generateJson<RawMeal>({
       systemInstruction:
         locale === 'he'
-          ? 'אתה תזונאי מדויק. אתה מעריך ערכים תזונתיים לפי תיאור חופשי בעברית. אתה מקפיד מאוד על כמויות וגדלים (מיני / קטן / גדול / חצי) ולא מחליף אותם במנה סטנדרטית.'
-          : "Tu es nutritionniste précis. Tu estimes les valeurs nutritionnelles d'un repas décrit librement, en français. Tu respects scrupuleusement les quantités et tailles (mini / petit / grand / demi) et tu ne les remplaces jamais par une portion standard.",
-      prompt: buildPrompt(locale, description),
+          ? 'אתה תזונאי מדויק. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים תזונתיים. כשיש אי-בהירות (כמויות חסרות, שתי חלבונים זה לצד זה, ניסוח דו-משמעי) אתה שואל שאלות קצרות עם אפשרויות במקום לנחש.'
+          : "Tu es nutritionniste précis. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros. En cas d'ambiguïté (quantités manquantes, deux protéines côte à côte, formulation douteuse), tu poses des questions courtes à choix plutôt que de fusionner ou d'inventer.",
+      prompt: buildPrompt(locale, description, clarifications),
       schema: MEAL_SCHEMA,
       schemaName: 'meal_analysis',
       purpose: 'meal',
       temperature: 0.1,
     });
 
-    sendJson(res, 200, { meal: normalize(raw, description), remaining });
+    const status =
+      raw.status === 'needs_clarification' ? 'needs_clarification' : 'ready';
+    const questions = normalizeQuestions(raw.questions);
+
+    // Si le modèle demande des précisions mais n’en fournit aucune, on force ready.
+    if (status === 'needs_clarification' && questions.length > 0 && !clarifications) {
+      sendJson(res, 200, {
+        status: 'needs_clarification',
+        questions,
+        remaining,
+      });
+      return;
+    }
+
+    sendJson(res, 200, {
+      status: 'ready',
+      meal: normalizeMeal(raw, description),
+      remaining,
+    });
   } catch (error) {
     sendError(res, error);
   }
 }
 
-function buildPrompt(locale: Locale, description: string): string {
+function readClarifications(value: unknown): string {
+  if (typeof value === 'string') return value.trim().slice(0, 800);
+  if (!Array.isArray(value)) return '';
+  const lines: string[] = [];
+  for (const entry of value.slice(0, 6)) {
+    const record = asRecord(entry);
+    const prompt = readString(record, 'prompt', 160);
+    const answer = readString(record, 'answer', 160);
+    if (!answer) continue;
+    lines.push(prompt ? `${prompt} → ${answer}` : answer);
+  }
+  return lines.join('\n').slice(0, 800);
+}
+
+function buildPrompt(
+  locale: Locale,
+  description: string,
+  clarifications: string,
+): string {
+  const clarificationBlock = clarifications
+    ? locale === 'he'
+      ? `\nתשובות המשתמש לשאלות הבהרה:\n${clarifications}\n`
+      : `\nRéponses de l'utilisateur aux questions de clarification :\n${clarifications}\n`
+    : '';
+
   if (locale === 'he') {
-    return `נתח את הארוחה הבאה והחזר את הערכים התזונתיים המשוערים שלה.
+    return `נתח את הארוחה הבאה.
 
 תיאור הארוחה: « ${description} »
+${clarificationBlock}
+כללי פירוק (קריטיים):
+- כל מזון שמוזכר הוא פריט נפרד, אלא אם המשתמש אמר במפורש מנה מורכבת אחת (« חביתת עוף », « סלט עוף »).
+- « ביצים ועוף וסלט » = 3 פריטים נפרדים. לעולם אל תמזג ל« ביצי עוף ».
+- מוצר מותג אחד (למשל "מיני מילקי ווי") הוא פריט אחד — אל תפרק למרכיבים.
+- אל תוסיף מזונות שלא הוזכרו.
 
-כללים:
-- פרק את הארוחה לפריטים נפרדים לפי מה שנאמר בתיאור.
-- מוצר מותג אחד (למשל "מיני מילקי ווי") הוא פריט אחד בלבד — אל תפרק אותו למרכיבים (שוקולד / קרמל / נוגט).
-- כבד בדיוק את הכמויות והגדלים שצוינו: "מיני", "קטן", "גדול", "חצי", "כפית", "כף", משקל בגרמים וכו'. מיני ≠ רגיל.
-- אם הכמות לא צוינה, הנח מנה רגילה וכתוב אותה במפורש ב-"quantity".
-- ב-"quantity" כתוב את הגודל שנלקח בחשבון (למשל "1 יחידת מיני (~18 ג')").
-- השתמש בערכים מציאותיים לגודל הזה (למשל מיני מילקי ווי ≈ 75–90 קק"ל, לא כמו בר רגיל).
-- "kcal" הוא מספר שלם, "proteinG" / "carbsG" / "fatG" בגרמים.
-- אל תוסיף פריטים שלא הוזכרו.`;
+מתי להחזיר status = "needs_clarification":
+- חסרות כמויות לרוב הפריטים, או
+- שתי חלבונים / בשרים זה לצד זה בלי להבהיר אם הם נפרדים או מנה אחת, או
+- ניסוח דו-משמעי שיכול להתפרש כמנה מורכבת.
+אז מלא "questions" ב-1 עד 3 שאלות קצרות, כל אחת עם 2–4 "options" ברורות. השאר "items" ריק ו-"label" ריק.
+אם כבר יש תשובות הבהרה למעלה, אל תשאל שוב: החזר status = "ready" עם הפירוק.
+
+כש-status = "ready":
+- מלא "items" עם name / quantity / kcal / proteinG / carbsG / fatG.
+- כבד כמויות וגדלים (« מיני », « קטן », גרמים…). אם לא צוין, הנח מנה רגילה וכתוב אותה ב-"quantity".
+- "questions" חייב להיות מערך ריק [].`;
   }
 
-  return `Analyse le repas suivant et renvoie son estimation nutritionnelle.
+  return `Analyse le repas suivant.
 
 Description du repas : « ${description} »
+${clarificationBlock}
+Règles de décomposition (critiques) :
+- Chaque aliment mentionné = un item SÉPARÉ, sauf si l'utilisateur décrit clairement UN plat composé (« omelette au poulet », « salade de poulet »).
+- « œufs, poulet et salade » ou « des œufs du poulet et une salade » = 3 items distincts. Ne fusionne JAMAIS en « œufs au poulet ».
+- Un produit de marque (ex. « mini Milky Way ») = UN item, ne le découpe pas en ingrédients.
+- N'ajoute aucun aliment non mentionné.
 
-Règles :
-- Décompose le repas en aliments distincts selon ce qui est dit.
-- Un produit de marque (ex. « mini Milky Way ») = UN seul item : ne le découpe pas en ingrédients (chocolat / caramel / nougat).
-- Respecte exactement les quantités et tailles indiquées : « mini », « petit », « grand », « demi », cuillère, grammes, etc. Mini ≠ format classique.
-- Si la quantité n'est pas précisée, retiens une portion standard et écris-la clairement dans "quantity".
-- Dans "quantity", indique la taille effectivement retenue (ex. « 1 mini (~18 g) »).
-- Utilise des calories réalistes pour CETTE taille (ex. un mini Milky Way ≈ 75–90 kcal, pas celles d'une barre normale).
-- "kcal" est un entier, "proteinG" / "carbsG" / "fatG" sont en grammes.
-- N'ajoute aucun aliment qui n'a pas été mentionné.`;
+Quand renvoyer status = "needs_clarification" :
+- quantités absentes pour la plupart des aliments, OU
+- deux protéines / viandes côte à côte sans préciser si séparées ou en un seul plat, OU
+- formulation ambiguë qui pourrait être un plat composé.
+Alors remplis "questions" avec 1 à 3 questions courtes, chacune avec 2 à 4 "options" claires. Laisse "items" vide et "label" vide.
+Si des réponses de clarification sont déjà fournies ci-dessus, ne re-pose pas de questions : renvoie status = "ready" avec la décomposition.
+
+Quand status = "ready" :
+- remplis "items" (name / quantity / kcal / proteinG / carbsG / fatG) ;
+- respecte les tailles (« mini », « petit », grammes…). Si absente, portion standard explicite dans "quantity" ;
+- "questions" doit être un tableau vide [].`;
 }
 
 export type AnalyzedMeal = {
@@ -140,11 +224,44 @@ export type AnalyzedMeal = {
   }[];
 };
 
+export type ClarifyingQuestion = {
+  id: string;
+  prompt: string;
+  options: string[];
+};
+
+function normalizeQuestions(
+  raw: RawMeal['questions'],
+): ClarifyingQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  const questions: ClarifyingQuestion[] = [];
+  for (const [index, entry] of raw.slice(0, 3).entries()) {
+    const prompt = String(entry?.prompt ?? '').trim().slice(0, 160);
+    if (!prompt) continue;
+    const options = Array.isArray(entry?.options)
+      ? entry.options
+          .filter((option): option is string => typeof option === 'string')
+          .map((option) => option.trim().slice(0, 80))
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+    if (options.length < 2) continue;
+    questions.push({
+      id: String(entry?.id ?? `q${index + 1}`)
+        .trim()
+        .slice(0, 32) || `q${index + 1}`,
+      prompt,
+      options,
+    });
+  }
+  return questions;
+}
+
 /**
  * Les totaux sont recalculés depuis les aliments : le modèle se trompe plus
  * souvent sur une addition que sur l'estimation d'un aliment isolé.
  */
-function normalize(raw: RawMeal, fallbackLabel: string): AnalyzedMeal {
+function normalizeMeal(raw: RawMeal, fallbackLabel: string): AnalyzedMeal {
   const items = (raw.items ?? [])
     .slice(0, 20)
     .map((item) => ({

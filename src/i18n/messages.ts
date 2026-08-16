@@ -334,6 +334,8 @@ const fr = {
   'ai.err.ai_invalid_json': 'Réponse illisible du modèle. Réessaie.',
   'ai.err.ai_invalid_program': 'Réponse inutilisable du modèle. Relance la génération.',
   'ai.err.description_required': 'Décris ton repas en quelques mots.',
+  'ai.err.clarification_required':
+    'Réponds à toutes les questions avant de continuer.',
   'ai.err.generic': 'La génération a échoué. Réessaie.',
 
   'nav.nutrition': 'Nutrition',
@@ -388,6 +390,17 @@ const fr = {
   'nutrition.saveConfig': 'Enregistrer l’objectif',
   'nutrition.configSaved': 'Objectif enregistré.',
   'nutrition.configInvalid': 'Vérifie l’objectif et le nombre de séances (1–7).',
+  'nutrition.clarifyTitle': 'Quelques précisions',
+  'nutrition.clarifyHint':
+    'L’IA a un doute sur la décomposition. Réponds puis relance l’analyse.',
+  'nutrition.clarifySubmit': 'Valider et analyser',
+  'nutrition.editHint':
+    'Vérifie et corrige les aliments avant d’ajouter au journal.',
+  'nutrition.mealLabel': 'Libellé du repas',
+  'nutrition.itemName': 'Aliment',
+  'nutrition.itemQty': 'Quantité',
+  'nutrition.addItem': '+ Aliment',
+  'nutrition.removeItem': 'Retirer',
 
   'units.g': 'g',
 } as const;
@@ -721,6 +734,7 @@ const he: Record<MessageKey, string> = {
   'ai.err.ai_invalid_json': 'תשובה לא קריאה מהמודל. נסה שוב.',
   'ai.err.ai_invalid_program': 'התשובה מהמודל לא שמישה. נסה ליצור מחדש.',
   'ai.err.description_required': 'תאר את הארוחה בכמה מילים.',
+  'ai.err.clarification_required': 'ענה על כל השאלות לפני המשך.',
   'ai.err.generic': 'היצירה נכשלה. נסה שוב.',
 
   'nav.nutrition': 'תזונה',
@@ -775,6 +789,16 @@ const he: Record<MessageKey, string> = {
   'nutrition.saveConfig': 'שמירת היעד',
   'nutrition.configSaved': 'היעד נשמר.',
   'nutrition.configInvalid': 'בדוק את המטרה ומספר האימונים (1–7).',
+  'nutrition.clarifyTitle': 'כמה הבהרות',
+  'nutrition.clarifyHint':
+    'ל-AI יש ספק בפירוק. ענה ואז הפעל שוב את הניתוח.',
+  'nutrition.clarifySubmit': 'אישור וניתוח',
+  'nutrition.editHint': 'בדוק ותקן את המזונות לפני הוספה ליומן.',
+  'nutrition.mealLabel': 'שם הארוחה',
+  'nutrition.itemName': 'מזון',
+  'nutrition.itemQty': 'כמות',
+  'nutrition.addItem': '+ מזון',
+  'nutrition.removeItem': 'הסרה',
 
   'units.g': 'גרם',
 };
