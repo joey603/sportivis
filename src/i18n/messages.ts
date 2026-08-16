@@ -321,7 +321,7 @@ const fr = {
   'ai.err.missing_groq_key':
     'Clé Groq manquante : ajoute GROQ_API_KEY dans Vercel → Settings → Environment Variables (Production), puis redéploie.',
   'ai.err.invalid_groq_key':
-    'Groq refuse la clé (401). Dans Vercel, rouvre GROQ_API_KEY : colle uniquement la clé (ex. gsk_…), sans guillemets ni « Bearer », Production cochée, puis Redeploy.',
+    'Le modèle est momentanément injoignable. Réessaie dans quelques secondes.',
   'ai.err.missing_supabase_config':
     'Config Supabase manquante côté serveur : ajoute SUPABASE_URL et SUPABASE_ANON_KEY (ou les VITE_*) sur Vercel.',
   'ai.err.migration_missing': 'Migration IA manquante côté base de données.',
@@ -392,8 +392,9 @@ const fr = {
   'nutrition.configInvalid': 'Vérifie l’objectif et le nombre de séances (1–7).',
   'nutrition.clarifyTitle': 'Quelques précisions',
   'nutrition.clarifyHint':
-    'L’IA a un doute sur la décomposition. Réponds puis relance l’analyse.',
+    'L’IA a un doute. Réponds aux questions, ou ajoute sans précision avec une portion normale.',
   'nutrition.clarifySubmit': 'Valider et analyser',
+  'nutrition.clarifySkip': 'Ajoute sans précision',
   'nutrition.editHint':
     'Vérifie et corrige les aliments avant d’ajouter au journal.',
   'nutrition.mealLabel': 'Libellé du repas',
@@ -725,7 +726,7 @@ const he: Record<MessageKey, string> = {
   'ai.err.missing_groq_key':
     'חסר מפתח Groq: הוסף GROQ_API_KEY ב-Vercel → Settings → Environment Variables (Production) ואז פרוס מחדש.',
   'ai.err.invalid_groq_key':
-    'Groq דוחה את המפתח (401). ב-Vercel פתח מחדש את GROQ_API_KEY: הדבק רק את המפתח (למשל gsk_…), בלי מרכאות ובלי Bearer, סמן Production ואז Redeploy.',
+    'המודל אינו זמין כרגע. נסה שוב בעוד כמה שניות.',
   'ai.err.missing_supabase_config':
     'חסרה הגדרת Supabase בשרת: הוסף SUPABASE_URL ו-SUPABASE_ANON_KEY (או VITE_*) ב-Vercel.',
   'ai.err.migration_missing': 'חסרה מיגרציית AI בבסיס הנתונים.',
@@ -795,8 +796,9 @@ const he: Record<MessageKey, string> = {
   'nutrition.configInvalid': 'בדוק את המטרה ומספר האימונים (1–7).',
   'nutrition.clarifyTitle': 'כמה הבהרות',
   'nutrition.clarifyHint':
-    'ל-AI יש ספק בפירוק. ענה ואז הפעל שוב את הניתוח.',
+    'ל-AI יש ספק. ענה על השאלות, או הוסף בלי דיוק עם מנה רגילה.',
   'nutrition.clarifySubmit': 'אישור וניתוח',
+  'nutrition.clarifySkip': 'הוסף בלי דיוק',
   'nutrition.editHint': 'בדוק ותקן את המזונות לפני הוספה ליומן.',
   'nutrition.mealLabel': 'שם הארוחה',
   'nutrition.itemName': 'מזון',

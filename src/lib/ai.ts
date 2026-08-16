@@ -37,7 +37,9 @@ export function aiErrorMessage(
   code: string,
   t: (key: MessageKey) => string,
 ): string {
-  const key = `ai.err.${code}` as MessageKey;
+  // Ancien code trompeur (« clé Vercel ») : la clé est OK, on affiche un retry.
+  const normalized = code === 'invalid_groq_key' ? 'ai_unreachable' : code;
+  const key = `ai.err.${normalized}` as MessageKey;
   const text = t(key);
   return text === key ? t('ai.err.generic') : text;
 }
@@ -116,11 +118,13 @@ export async function analyzeMealAi(
   description: string,
   locale: Locale,
   clarifications?: MealClarificationAnswer[],
+  options?: { assumeTypical?: boolean },
 ): Promise<AnalyzeMealResult> {
   return post<AnalyzeMealResult>('/api/analyze-meal', {
     description,
     locale,
     clarifications: clarifications?.length ? clarifications : undefined,
+    assumeTypical: options?.assumeTypical === true ? true : undefined,
   });
 }
 
