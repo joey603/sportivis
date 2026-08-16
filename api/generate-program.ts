@@ -1,7 +1,7 @@
 import { EXERCISES } from '../src/data/exercises.js';
 import type { Locale } from '../src/i18n/messages';
 import {
-  buildExerciseCatalog,
+  buildCompactExerciseCatalog,
   buildFormatInstructions,
 } from '../src/lib/programPrompt.js';
 import type { Exercise } from '../src/types';
@@ -177,15 +177,15 @@ Choisis entre 5 et 10 exercices dans un ordre cohérent (polyarticulaires avant 
 
   const catalogHeader =
     locale === 'he'
-      ? `תרגילים זמינים (${catalog.length}) — פורמט « id | שם | שריר | ציוד | מעקב | מנוחה ברירת מחדל » :`
-      : `Exercices disponibles (${catalog.length}) — format « id | nom | muscle | équipement | suivi | repos par défaut » :`;
+      ? `תרגילים זמינים (${catalog.length}) — פורמט « id|שם|שריר|ציוד|מעקב|מנוחה » :`
+      : `Exercices disponibles (${catalog.length}) — format « id|nom|muscle|équipement|suivi|repos » :`;
 
   return `${brief}
 
 ${buildFormatInstructions(locale)}
 
 ${catalogHeader}
-${buildExerciseCatalog(catalog, locale)}`;
+${buildCompactExerciseCatalog(catalog)}`;
 }
 
 /**

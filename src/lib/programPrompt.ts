@@ -72,6 +72,19 @@ export function buildExerciseCatalog(
   return lines.join('\n');
 }
 
+/**
+ * Catalogue compact pour les appels Groq (plafond TPM free ~8k) : ids bruts,
+ * sans libellés localisés qui gonflent le prompt.
+ */
+export function buildCompactExerciseCatalog(exercises: Exercise[]): string {
+  return exercises
+    .map(
+      (exercise) =>
+        `${exercise.id}|${exercise.name}|${exercise.muscle}|${exercise.equipment}|${exercise.tracking}|${exercise.defaultRestSec}`,
+    )
+    .join('\n');
+}
+
 export function buildChatGptPrompt(
   exercises: Exercise[],
   locale: Locale = 'fr',

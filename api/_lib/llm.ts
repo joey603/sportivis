@@ -2,11 +2,19 @@ import { HttpError } from './http.js';
 import { requireEnv } from './quota.js';
 
 /**
- * Client LLM via Groq (API compatible OpenAI). Les anciens Llama 3.1 / 3.3
- * ont été retirés le 16/08/2026 : on pointe vers les remplacements officiels
- * (gpt-oss), avec un alias pour les anciennes variables d'environnement.
+ * Client LLM via Groq (API compatible OpenAI).
+ *
+ * Pourquoi pas `openai/gpt-oss-120b` pour les programmes :
+ * - plafond free ~8 000 TPM : le catalogue d'exercices (~4–5k tokens) + la
+ *   réponse fait souvent dépasser → 413 « Request too large »
+ * - le 120b est un modèle « reasoning » : sans `reasoning_effort: low` il
+ *   brûle le budget tokens en réflexion et renvoie parfois un content vide
+ * - certains comptes free reçoivent 403 sur le 120b, affiché à tort comme
+ *   « non configuré »
+ *
+ * On reste donc sur `openai/gpt-oss-20b` (même famille, JSON stable, ~1000 t/s).
  */
-const DEFAULT_MODEL_PROGRAM = 'openai/gpt-oss-120b';
+const DEFAULT_MODEL_PROGRAM = 'openai/gpt-oss-20b';
 const DEFAULT_MODEL_MEAL = 'openai/gpt-oss-20b';
 const TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 3;
@@ -19,6 +27,8 @@ const MODEL_ALIASES: Record<string, string> = {
   'llama-3.1-70b-versatile': DEFAULT_MODEL_PROGRAM,
   'llama3-70b-8192': DEFAULT_MODEL_PROGRAM,
   'llama3-8b-8192': DEFAULT_MODEL_MEAL,
+  // Trop lourd pour le tier gratuit avec notre catalogue programmes.
+  'openai/gpt-oss-120b': DEFAULT_MODEL_PROGRAM,
 };
 
 export type AiPurpose = 'program' | 'meal';
@@ -35,11 +45,19 @@ export type JsonSchema = {
 };
 
 export function assertLlmConfigured(): void {
-  requireEnv('GROQ_API_KEY');
+  const key = requireEnv('GROQ_API_KEY');
+  if (/^(votre_|your_|xxx|changeme|replace)/i.test(key)) {
+    throw new HttpError(503, 'server_not_configured');
+  }
 }
 
+type GroqMessage = {
+  content?: string | null;
+  reasoning?: string | null;
+};
+
 type GroqResponse = {
-  choices?: { message?: { content?: string | null } }[];
+  choices?: { message?: GroqMessage }[];
   error?: { message?: string };
 };
 
@@ -56,20 +74,13 @@ export async function generateJson<T>(options: {
   temperature?: number;
 }): Promise<T> {
   const apiKey = requireEnv('GROQ_API_KEY');
+  if (/^(votre_|your_|xxx|changeme|replace)/i.test(apiKey)) {
+    throw new HttpError(503, 'server_not_configured');
+  }
   const model = resolveModel(options.purpose);
-  // Les modèles Llama de Groq ne gèrent pas `json_schema`, seulement le mode
-  // `json_object` (qui exige le mot « JSON » dans le prompt). On décrit donc la
-  // forme attendue en toutes lettres.
+  // Les modèles Groq en mode `json_object` exigent le mot « JSON » dans le prompt.
   const system = `${options.systemInstruction}\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans texte autour, respectant exactement cette forme :\n${describeSchema(options.schema)}`;
-  const body = JSON.stringify({
-    model,
-    temperature: options.temperature ?? 0.7,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: options.prompt },
-    ],
-    response_format: { type: 'json_object' },
-  });
+  const body = buildRequestBody(model, system, options.prompt, options.temperature);
 
   let lastOverload: HttpError | null = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -82,6 +93,28 @@ export async function generateJson<T>(options: {
   }
 
   throw lastOverload ?? new HttpError(503, 'ai_overloaded');
+}
+
+function buildRequestBody(
+  model: string,
+  system: string,
+  prompt: string,
+  temperature: number | undefined,
+): string {
+  const payload: Record<string, unknown> = {
+    model,
+    temperature: temperature ?? 0.7,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt },
+    ],
+    response_format: { type: 'json_object' },
+  };
+  // gpt-oss : sans ça le modèle « réfléchit » trop et peut renvoyer content vide.
+  if (model.includes('gpt-oss')) {
+    payload.reasoning_effort = 'low';
+  }
+  return JSON.stringify(payload);
 }
 
 function resolveModel(purpose: AiPurpose): string {
@@ -152,16 +185,21 @@ async function requestOnce<T>(
 
   if (!response.ok) {
     const groqMessage = payload?.error?.message ?? '';
-    if (response.status === 429 || response.status === 503) {
+    // 413 = requête trop grosse pour le plafond TPM du modèle (ex. 120b free).
+    if (
+      response.status === 429 ||
+      response.status === 503 ||
+      response.status === 413
+    ) {
       console.error(`[groq] ${response.status} ${model}: ${groqMessage || 'overloaded'}`);
       return {
         ok: false,
         retryable: true,
-        error: new HttpError(response.status, 'ai_overloaded'),
+        error: new HttpError(response.status === 413 ? 429 : response.status, 'ai_overloaded'),
       };
     }
-    // Clé absente / invalide côté Groq → vraiment une mauvaise config serveur.
-    if (response.status === 401 || response.status === 403) {
+    // Clé absente / invalide.
+    if (response.status === 401) {
       console.error('[groq]', groqMessage);
       return {
         ok: false,
@@ -169,7 +207,15 @@ async function requestOnce<T>(
         error: new HttpError(503, 'server_not_configured'),
       };
     }
-    // Modèle retiré ou inconnu : ne plus afficher « non configuré ».
+    // 403 = souvent modèle non autorisé sur ce compte, pas une clé manquante.
+    if (response.status === 403) {
+      console.error('[groq]', model, groqMessage);
+      return {
+        ok: false,
+        retryable: false,
+        error: new HttpError(502, 'ai_unreachable'),
+      };
+    }
     if (
       response.status === 400 &&
       /model|decommission|not found|does not exist/i.test(groqMessage)
@@ -193,7 +239,7 @@ async function requestOnce<T>(
     return { ok: false, retryable: false, error: new HttpError(502, 'ai_unreachable') };
   }
 
-  const text = payload?.choices?.[0]?.message?.content?.trim() ?? '';
+  const text = extractJsonText(payload?.choices?.[0]?.message);
   if (!text) {
     return { ok: false, retryable: false, error: new HttpError(502, 'ai_empty') };
   }
@@ -203,6 +249,18 @@ async function requestOnce<T>(
   } catch {
     return { ok: false, retryable: false, error: new HttpError(502, 'ai_invalid_json') };
   }
+}
+
+/** Contenu utile : `content` d'abord, sinon JSON extrait du champ reasoning. */
+function extractJsonText(message: GroqMessage | undefined): string {
+  const content = message?.content?.trim() ?? '';
+  if (content) return content;
+  const reasoning = message?.reasoning?.trim() ?? '';
+  if (!reasoning) return '';
+  const start = reasoning.indexOf('{');
+  const end = reasoning.lastIndexOf('}');
+  if (start >= 0 && end > start) return reasoning.slice(start, end + 1);
+  return '';
 }
 
 function delay(ms: number): Promise<void> {
