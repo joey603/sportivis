@@ -321,7 +321,7 @@ const fr = {
   'ai.err.missing_groq_key':
     'Clé Groq manquante : ajoute GROQ_API_KEY dans Vercel → Settings → Environment Variables (Production), puis redéploie.',
   'ai.err.invalid_groq_key':
-    'Groq refuse clairement la clé. Si https://sportivis.vercel.app/api/ai-status est OK, réessaie ; sinon recrée GROQ_API_KEY (gsk_… seul, Production) et Redeploy.',
+    'Le modèle est momentanément injoignable. Réessaie dans quelques secondes.',
   'ai.err.missing_supabase_config':
     'Config Supabase manquante côté serveur : ajoute SUPABASE_URL et SUPABASE_ANON_KEY (ou les VITE_*) sur Vercel.',
   'ai.err.migration_missing': 'Migration IA manquante côté base de données.',
@@ -726,7 +726,7 @@ const he: Record<MessageKey, string> = {
   'ai.err.missing_groq_key':
     'חסר מפתח Groq: הוסף GROQ_API_KEY ב-Vercel → Settings → Environment Variables (Production) ואז פרוס מחדש.',
   'ai.err.invalid_groq_key':
-    'Groq דוחה את המפתח. אם /api/ai-status תקין — נסה שוב; אחרת צור מחדש את GROQ_API_KEY (רק gsk_…, Production) ופרוס מחדש.',
+    'המודל אינו זמין כרגע. נסה שוב בעוד כמה שניות.',
   'ai.err.missing_supabase_config':
     'חסרה הגדרת Supabase בשרת: הוסף SUPABASE_URL ו-SUPABASE_ANON_KEY (או VITE_*) ב-Vercel.',
   'ai.err.migration_missing': 'חסרה מיגרציית AI בבסיס הנתונים.',

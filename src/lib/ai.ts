@@ -37,7 +37,9 @@ export function aiErrorMessage(
   code: string,
   t: (key: MessageKey) => string,
 ): string {
-  const key = `ai.err.${code}` as MessageKey;
+  // Ancien code trompeur (« clé Vercel ») : la clé est OK, on affiche un retry.
+  const normalized = code === 'invalid_groq_key' ? 'ai_unreachable' : code;
+  const key = `ai.err.${normalized}` as MessageKey;
   const text = t(key);
   return text === key ? t('ai.err.generic') : text;
 }

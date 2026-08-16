@@ -66,22 +66,38 @@ export async function generateJson<T>(options: {
   temperature?: number;
 }): Promise<T> {
   const apiKey = requireGroqApiKey();
-  const model = resolveModel(options.purpose);
+  const models = modelCandidates(options.purpose);
   // Les modèles Groq en mode `json_object` exigent le mot « JSON » dans le prompt.
   const system = `${options.systemInstruction}\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans texte autour, respectant exactement cette forme :\n${describeSchema(options.schema)}`;
-  const body = buildRequestBody(model, system, options.prompt, options.temperature);
 
-  let lastOverload: HttpError | null = null;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) await delay(RETRY_DELAYS_MS[attempt - 1]);
+  let lastError: HttpError | null = null;
+  for (const model of models) {
+    const body = buildRequestBody(
+      model,
+      system,
+      options.prompt,
+      options.temperature,
+    );
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (attempt > 0) await delay(RETRY_DELAYS_MS[attempt - 1]);
 
-    const result = await requestOnce<T>(model, apiKey, body);
-    if (result.ok) return result.value;
-    if (!result.retryable) throw result.error;
-    lastOverload = result.error;
+      const result = await requestOnce<T>(model, apiKey, body);
+      if (result.ok) return result.value;
+      lastError = result.error;
+      if (result.retryable) continue;
+      if (result.tryNextModel) break;
+      throw result.error;
+    }
   }
 
-  throw lastOverload ?? new HttpError(503, 'ai_overloaded');
+  throw lastError ?? new HttpError(503, 'ai_overloaded');
+}
+
+function modelCandidates(purpose: AiPurpose): string[] {
+  const primary = resolveModel(purpose);
+  const fallback =
+    purpose === 'meal' ? DEFAULT_MODEL_PROGRAM : DEFAULT_MODEL_MEAL;
+  return primary === fallback ? [primary] : [primary, fallback];
 }
 
 function buildRequestBody(
@@ -139,7 +155,13 @@ function describeSchema(schema: JsonSchema): string {
 
 type RequestResult<T> =
   | { ok: true; value: T }
-  | { ok: false; retryable: boolean; error: HttpError };
+  | {
+      ok: false;
+      retryable: boolean;
+      /** Passer au modèle de secours (401/403/modèle mort). */
+      tryNextModel?: boolean;
+      error: HttpError;
+    };
 
 async function requestOnce<T>(
   model: string,
@@ -188,27 +210,23 @@ async function requestOnce<T>(
       };
     }
     if (response.status === 401) {
+      // La clé est déjà présente et formatée (gsk_…) côté serveur. Un 401 chat
+      // est souvent transitoire ou lié au modèle — on ne renvoie PLUS
+      // invalid_groq_key (message Vercel trompeur si /api/ai-status est OK).
       console.error('[groq] 401', model, groqMessage || '(empty)');
-      // Message vide / ambigu : souvent un 401 transitoire côté gateway, pas
-      // une clé Vercel cassée (surtout si /api/ai-status répond déjà OK).
-      if (isClearInvalidApiKey(groqMessage)) {
-        return {
-          ok: false,
-          retryable: false,
-          error: new HttpError(503, 'invalid_groq_key'),
-        };
-      }
       return {
         ok: false,
         retryable: true,
+        tryNextModel: true,
         error: new HttpError(503, 'ai_unreachable'),
       };
     }
     if (response.status === 403) {
-      console.error('[groq]', model, groqMessage);
+      console.error('[groq] 403', model, groqMessage);
       return {
         ok: false,
         retryable: false,
+        tryNextModel: true,
         error: new HttpError(502, 'ai_unreachable'),
       };
     }
@@ -220,6 +238,7 @@ async function requestOnce<T>(
       return {
         ok: false,
         retryable: false,
+        tryNextModel: true,
         error: new HttpError(502, 'ai_unreachable'),
       };
     }
@@ -256,14 +275,6 @@ function extractJsonText(message: GroqMessage | undefined): string {
   const end = reasoning.lastIndexOf('}');
   if (start >= 0 && end > start) return reasoning.slice(start, end + 1);
   return '';
-}
-
-/** Vrai seulement si Groq dit clairement que la clé est mauvaise. */
-function isClearInvalidApiKey(message: string): boolean {
-  if (!message.trim()) return false;
-  return /invalid\s+api\s+key|incorrect\s+api\s+key|wrong\s+api\s+key|api[_ ]?key[_ ]?(is[_ ]?)?(invalid|required|missing)|authentication[_ ]?failed|invalid[_ ]?credentials/i.test(
-    message,
-  );
 }
 
 function delay(ms: number): Promise<void> {
