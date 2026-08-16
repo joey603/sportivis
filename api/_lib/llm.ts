@@ -11,8 +11,8 @@ import { requireGroqApiKey } from './quota.js';
  */
 const DEFAULT_MODEL_PROGRAM = 'llama-3.3-70b-versatile';
 const DEFAULT_MODEL_MEAL = 'llama-3.1-8b-instant';
-/** Llama 8B : le plus régulier sur Groq free. Pas de gpt-oss (401 fréquents). */
-const RELIABLE_MODELS = [
+/** Llama 8B : le plus régulier pour les repas. Les programmes restent en 70B. */
+const RELIABLE_MEAL_MODELS = [
   'llama-3.1-8b-instant',
   'llama-3.3-70b-versatile',
 ] as const;
@@ -137,15 +137,15 @@ export async function generateJson<T>(options: {
 }
 
 function modelCandidates(purpose: AiPurpose): string[] {
-  const preferred = lastGoodModel[purpose];
   const primary = resolveModel(purpose);
+  // Programmes : uniquement le 70B, comme avant — pas de bascule vers le 8B.
+  if (purpose === 'program') return [primary];
+
+  const preferred = lastGoodModel.meal;
   const now = Date.now();
-  const ordered = [
-    preferred,
-    purpose === 'meal' ? DEFAULT_MODEL_MEAL : DEFAULT_MODEL_PROGRAM,
-    ...RELIABLE_MODELS,
-    primary,
-  ].filter((model): model is string => Boolean(model));
+  const ordered = [preferred, DEFAULT_MODEL_MEAL, ...RELIABLE_MEAL_MODELS, primary].filter(
+    (model): model is string => Boolean(model),
+  );
 
   const seen = new Set<string>();
   const ready: string[] = [];
@@ -157,7 +157,6 @@ function modelCandidates(purpose: AiPurpose): string[] {
     if (until > now) cooling.push(model);
     else ready.push(model);
   }
-  // Si tous sont en cooldown, on les réessaie quand même (401 souvent bref).
   return ready.length ? ready.concat(cooling) : cooling;
 }
 

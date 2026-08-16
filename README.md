@@ -70,7 +70,7 @@ GROQ_API_KEY=...
    Puis **redéploie**. Les variables `VITE_` seules suffisent au front, pas forcément aux fonctions serverless si elles ne sont pas exposées au runtime.
 4. Exécute [`supabase/ai_features.sql`](supabase/ai_features.sql) : il crée le journal alimentaire et le compteur de quota.
 
-Par défaut, repas = `llama-3.1-8b-instant` (le plus régulier sur Groq gratuit) et programmes = `llama-3.3-70b-versatile`, avec bascule automatique. Les 401 intermittents Groq sont réessayés jusqu’à ~1 min.
+Par défaut, repas = `llama-3.1-8b-instant` et programmes = `llama-3.3-70b-versatile` (70B uniquement, sans bascule vers le 8B).
 
 Le quota journalier par utilisateur est appliqué dans Postgres (`consume_ai_quota`), donc il n’est pas contournable depuis le client : 10 générations de programme et 40 analyses de repas par jour. Les valeurs se changent dans la fonction `ai_quota_limit`.
 
