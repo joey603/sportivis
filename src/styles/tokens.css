@@ -1457,6 +1457,40 @@ html[dir='rtl'] .brand {
   gap: 0.4rem;
 }
 
+.meal-preview-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin: 0.85rem 0 1rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.meal-preview-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+}
+
+.meal-preview-tab.active {
+  background: var(--teal-dim);
+  color: var(--teal);
+}
+
+.nutrition-tab-hint {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
 .meal-macros {
   font-size: 0.82rem;
 }

@@ -401,6 +401,10 @@ const fr = {
   'nutrition.itemQty': 'Quantité',
   'nutrition.addItem': '+ Aliment',
   'nutrition.removeItem': 'Retirer',
+  'nutrition.tabEstimate': 'Estimation IA',
+  'nutrition.tabRefine': 'Préciser',
+  'nutrition.tabEstimateHint':
+    'Portions moyennes estimées par l’IA. Passe sur Préciser pour ajuster.',
 
   'units.g': 'g',
 } as const;
@@ -799,6 +803,10 @@ const he: Record<MessageKey, string> = {
   'nutrition.itemQty': 'כמות',
   'nutrition.addItem': '+ מזון',
   'nutrition.removeItem': 'הסרה',
+  'nutrition.tabEstimate': 'הערכת AI',
+  'nutrition.tabRefine': 'דיוק',
+  'nutrition.tabEstimateHint':
+    'מנות ממוצעות לפי הערכת ה-AI. עבור לדיוק כדי להתאים.',
 
   'units.g': 'גרם',
 };

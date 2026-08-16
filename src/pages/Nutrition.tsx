@@ -40,6 +40,8 @@ export function Nutrition() {
   const [busy, setBusy] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzedMeal | null>(null);
+  const [aiSnapshot, setAiSnapshot] = useState<AnalyzedMeal | null>(null);
+  const [previewTab, setPreviewTab] = useState<'estimate' | 'refine'>('estimate');
   const [questions, setQuestions] = useState<MealClarifyingQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [goal, setGoal] = useState<NutritionGoal | ''>(
@@ -95,13 +97,23 @@ export function Nutrition() {
       );
       if (result.status === 'needs_clarification') {
         setAnalysis(null);
+        setAiSnapshot(null);
         setQuestions(result.questions);
         setAnswers({});
         return;
       }
       setQuestions([]);
       setAnswers({});
-      setAnalysis(result.meal);
+      const meal = result.meal;
+      setAiSnapshot({
+        ...meal,
+        items: meal.items.map((item) => ({ ...item })),
+      });
+      setAnalysis({
+        ...meal,
+        items: meal.items.map((item) => ({ ...item })),
+      });
+      setPreviewTab('estimate');
     } catch (reason) {
       setErrorCode(aiErrorCode(reason));
     } finally {
@@ -176,6 +188,7 @@ export function Nutrition() {
       }),
     );
     setAnalysis(null);
+    setAiSnapshot(null);
     setQuestions([]);
     setAnswers({});
     setDescription('');
@@ -183,8 +196,10 @@ export function Nutrition() {
 
   function discardAnalysis() {
     setAnalysis(null);
+    setAiSnapshot(null);
     setQuestions([]);
     setAnswers({});
+    setPreviewTab('estimate');
   }
 
   function remove(id: string) {
@@ -428,6 +443,7 @@ export function Nutrition() {
               setQuestions([]);
               setAnswers({});
               setAnalysis(null);
+              setAiSnapshot(null);
             }}
             placeholder={t('nutrition.placeholder')}
           />
@@ -516,157 +532,241 @@ export function Nutrition() {
         <section className="panel meal-analysis">
           <div className="sheet-head">
             <div>
-              <h2>{t('nutrition.estimate')}</h2>
-              <p className="muted">{t('nutrition.editHint')}</p>
+              <h2>{analysis.label || t('nutrition.estimate')}</h2>
+              <p className="muted">
+                {previewTab === 'estimate'
+                  ? t('nutrition.estimateHint')
+                  : t('nutrition.editHint')}
+              </p>
             </div>
             <strong className="meal-kcal">
-              {numberFormat.format(analysis.kcal)} {t('units.kcal')}
+              {numberFormat.format(
+                previewTab === 'estimate'
+                  ? (aiSnapshot?.kcal ?? analysis.kcal)
+                  : analysis.kcal,
+              )}{' '}
+              {t('units.kcal')}
             </strong>
           </div>
 
-          <div className="field">
-            <label htmlFor="meal-label">{t('nutrition.mealLabel')}</label>
-            <input
-              id="meal-label"
-              value={analysis.label}
-              onChange={(event) =>
-                setAnalysis((current) =>
-                  current
-                    ? { ...current, label: event.target.value.slice(0, 60) }
-                    : current,
-                )
-              }
-            />
-          </div>
-
-          <ul className="meal-items meal-items-edit">
-            {analysis.items.map((item, index) => (
-              <li key={`edit-${index}`}>
-                <div className="meal-item-edit-grid">
-                  <div className="field">
-                    <label htmlFor={`item-name-${index}`}>
-                      {t('nutrition.itemName')}
-                    </label>
-                    <input
-                      id={`item-name-${index}`}
-                      value={item.name}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          name: event.target.value.slice(0, 80),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`item-qty-${index}`}>
-                      {t('nutrition.itemQty')}
-                    </label>
-                    <input
-                      id={`item-qty-${index}`}
-                      value={item.quantity}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          quantity: event.target.value.slice(0, 40),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`item-kcal-${index}`}>
-                      {t('units.kcal')}
-                    </label>
-                    <input
-                      id={`item-kcal-${index}`}
-                      type="number"
-                      min={0}
-                      value={item.kcal}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          kcal: Number(event.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`item-protein-${index}`}>
-                      {t('nutrition.protein')}
-                    </label>
-                    <input
-                      id={`item-protein-${index}`}
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={item.proteinG}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          proteinG: Number(event.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`item-carbs-${index}`}>
-                      {t('nutrition.carbs')}
-                    </label>
-                    <input
-                      id={`item-carbs-${index}`}
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={item.carbsG}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          carbsG: Number(event.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor={`item-fat-${index}`}>
-                      {t('nutrition.fat')}
-                    </label>
-                    <input
-                      id={`item-fat-${index}`}
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={item.fatG}
-                      onChange={(event) =>
-                        updateItem(index, {
-                          fatG: Number(event.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => removeItem(index)}
-                >
-                  {t('nutrition.removeItem')}
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <p className="meal-macros">
-            {t('nutrition.protein')} {gramsFormat.format(analysis.proteinG)}
-            {t('units.g')} · {t('nutrition.carbs')}{' '}
-            {gramsFormat.format(analysis.carbsG)}
-            {t('units.g')} · {t('nutrition.fat')}{' '}
-            {gramsFormat.format(analysis.fatG)}
-            {t('units.g')}
-          </p>
-
-          <div className="row-actions">
+          <div
+            className="meal-preview-tabs"
+            role="tablist"
+            aria-label={t('nutrition.estimate')}
+          >
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={addEmptyItem}
+              role="tab"
+              aria-selected={previewTab === 'estimate'}
+              className={
+                previewTab === 'estimate'
+                  ? 'meal-preview-tab active'
+                  : 'meal-preview-tab'
+              }
+              onClick={() => setPreviewTab('estimate')}
             >
-              {t('nutrition.addItem')}
+              {t('nutrition.tabEstimate')}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={previewTab === 'refine'}
+              className={
+                previewTab === 'refine'
+                  ? 'meal-preview-tab active'
+                  : 'meal-preview-tab'
+              }
+              onClick={() => setPreviewTab('refine')}
+            >
+              {t('nutrition.tabRefine')}
+            </button>
+          </div>
+
+          {previewTab === 'estimate' ? (
+            <>
+              <ul className="meal-items">
+                {(aiSnapshot ?? analysis).items.map((item, index) => (
+                  <li key={`estimate-${item.name}-${index}`}>
+                    <span>{item.name}</span>
+                    <span className="muted">
+                      {t('nutrition.itemQuantity', {
+                        quantity: item.quantity,
+                        kcal: numberFormat.format(item.kcal),
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="meal-macros">
+                {t('nutrition.protein')}{' '}
+                {gramsFormat.format((aiSnapshot ?? analysis).proteinG)}
+                {t('units.g')} · {t('nutrition.carbs')}{' '}
+                {gramsFormat.format((aiSnapshot ?? analysis).carbsG)}
+                {t('units.g')} · {t('nutrition.fat')}{' '}
+                {gramsFormat.format((aiSnapshot ?? analysis).fatG)}
+                {t('units.g')}
+              </p>
+              <p className="muted nutrition-tab-hint">
+                {t('nutrition.tabEstimateHint')}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="field">
+                <label htmlFor="meal-label">{t('nutrition.mealLabel')}</label>
+                <input
+                  id="meal-label"
+                  value={analysis.label}
+                  onChange={(event) =>
+                    setAnalysis((current) =>
+                      current
+                        ? { ...current, label: event.target.value.slice(0, 60) }
+                        : current,
+                    )
+                  }
+                />
+              </div>
+
+              <ul className="meal-items meal-items-edit">
+                {analysis.items.map((item, index) => (
+                  <li key={`edit-${index}`}>
+                    <div className="meal-item-edit-grid">
+                      <div className="field">
+                        <label htmlFor={`item-name-${index}`}>
+                          {t('nutrition.itemName')}
+                        </label>
+                        <input
+                          id={`item-name-${index}`}
+                          value={item.name}
+                          onChange={(event) =>
+                            updateItem(index, {
+                              name: event.target.value.slice(0, 80),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`item-qty-${index}`}>
+                          {t('nutrition.itemQty')}
+                        </label>
+                        <input
+                          id={`item-qty-${index}`}
+                          value={item.quantity}
+                          onChange={(event) =>
+                            updateItem(index, {
+                              quantity: event.target.value.slice(0, 40),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`item-kcal-${index}`}>
+                          {t('units.kcal')}
+                        </label>
+                        <input
+                          id={`item-kcal-${index}`}
+                          type="number"
+                          min={0}
+                          value={item.kcal}
+                          onChange={(event) =>
+                            updateItem(index, {
+                              kcal: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`item-protein-${index}`}>
+                          {t('nutrition.protein')}
+                        </label>
+                        <input
+                          id={`item-protein-${index}`}
+                          type="number"
+                          min={0}
+                          step={0.1}
+                          value={item.proteinG}
+                          onChange={(event) =>
+                            updateItem(index, {
+                              proteinG: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`item-carbs-${index}`}>
+                          {t('nutrition.carbs')}
+                        </label>
+                        <input
+                          id={`item-carbs-${index}`}
+                          type="number"
+                          min={0}
+                          step={0.1}
+                          value={item.carbsG}
+                          onChange={(event) =>
+                            updateItem(index, {
+                              carbsG: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`item-fat-${index}`}>
+                          {t('nutrition.fat')}
+                        </label>
+                        <input
+                          id={`item-fat-${index}`}
+                          type="number"
+                          min={0}
+                          step={0.1}
+                          value={item.fatG}
+                          onChange={(event) =>
+                            updateItem(index, {
+                              fatG: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => removeItem(index)}
+                    >
+                      {t('nutrition.removeItem')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="meal-macros">
+                {t('nutrition.protein')} {gramsFormat.format(analysis.proteinG)}
+                {t('units.g')} · {t('nutrition.carbs')}{' '}
+                {gramsFormat.format(analysis.carbsG)}
+                {t('units.g')} · {t('nutrition.fat')}{' '}
+                {gramsFormat.format(analysis.fatG)}
+                {t('units.g')}
+              </p>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={addEmptyItem}
+              >
+                {t('nutrition.addItem')}
+              </button>
+            </>
+          )}
+
+          <div className="row-actions" style={{ marginTop: '0.85rem' }}>
+            {previewTab === 'estimate' && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setPreviewTab('refine')}
+              >
+                {t('nutrition.tabRefine')}
+              </button>
+            )}
             <button type="button" className="btn btn-primary" onClick={save}>
               {t('nutrition.add')}
             </button>
