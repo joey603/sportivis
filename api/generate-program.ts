@@ -24,7 +24,7 @@ import {
 } from './_lib/http.js';
 import { consumeQuota } from './_lib/quota.js';
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 60 };
 
 const GOALS = ['masse', 'perte', 'force', 'endurance', 'forme'] as const;
 const LEVELS = ['debutant', 'intermediaire', 'avance'] as const;

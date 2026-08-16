@@ -16,9 +16,11 @@ const FALLBACK_MODELS = [
   'llama-3.3-70b-versatile',
   'openai/gpt-oss-20b',
 ] as const;
-const TIMEOUT_MS = 45_000;
-const MAX_ATTEMPTS = 2;
-const RETRY_DELAYS_MS = [500, 1200];
+/** Timeout d’un appel Groq : assez court pour plusieurs essais dans 1 min. */
+const ATTEMPT_TIMEOUT_MS = 18_000;
+/** On n’affiche l’échec qu’après ~1 min de retries automatiques. */
+const RETRY_BUDGET_MS = 55_000;
+const PAUSE_BETWEEN_TRIES_MS = 1_200;
 
 /** Anciens IDs / previews → modèles Groq production stables. */
 const MODEL_ALIASES: Record<string, string> = {
@@ -78,34 +80,38 @@ export async function generateJson<T>(options: {
   const system = `${options.systemInstruction}\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans texte autour, respectant exactement cette forme :\n${describeSchema(options.schema)}`;
 
   let lastError: HttpError | null = null;
+  const started = Date.now();
+  let tryIndex = 0;
 
-  // Deux tours de la chaîne de modèles : les 401 Groq sont souvent transitoires.
-  for (let round = 0; round < 2; round++) {
-    if (round > 0) await delay(RETRY_DELAYS_MS[1] ?? 1200);
+  while (Date.now() - started < RETRY_BUDGET_MS) {
+    const model = models[tryIndex % models.length];
+    const remaining = RETRY_BUDGET_MS - (Date.now() - started);
+    if (remaining < 2_000) break;
 
-    for (const model of models) {
-      const body = buildRequestBody(
-        model,
-        system,
-        options.prompt,
-        options.temperature,
-      );
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        if (attempt > 0) await delay(RETRY_DELAYS_MS[0] ?? 500);
-
-        const result = await requestOnce<T>(model, apiKey, body);
-        if (result.ok) {
-          if (round > 0 || model !== models[0]) {
-            console.info(`[groq] ok via ${model} (round ${round + 1})`);
-          }
-          return result.value;
-        }
-        lastError = result.error;
-        if (result.tryNextModel) break;
-        if (result.retryable) continue;
-        throw result.error;
+    const body = buildRequestBody(
+      model,
+      system,
+      options.prompt,
+      options.temperature,
+    );
+    const result = await requestOnce<T>(
+      model,
+      apiKey,
+      body,
+      Math.min(ATTEMPT_TIMEOUT_MS, remaining - 500),
+    );
+    if (result.ok) {
+      if (tryIndex > 0) {
+        console.info(`[groq] ok via ${model} after ${tryIndex + 1} tries`);
       }
+      return result.value;
     }
+    lastError = result.error;
+    if (!result.retryable && !result.tryNextModel) throw result.error;
+
+    tryIndex += 1;
+    const pause = Math.min(PAUSE_BETWEEN_TRIES_MS, RETRY_BUDGET_MS - (Date.now() - started));
+    if (pause > 0) await delay(pause);
   }
 
   throw lastError ?? new HttpError(503, 'ai_overloaded');
@@ -188,9 +194,10 @@ async function requestOnce<T>(
   model: string,
   apiKey: string,
   body: string,
+  timeoutMs: number,
 ): Promise<RequestResult<T>> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), Math.max(3_000, timeoutMs));
 
   let response: Response;
   try {
@@ -205,7 +212,7 @@ async function requestOnce<T>(
     });
   } catch (reason) {
     if (reason instanceof Error && reason.name === 'AbortError') {
-      return { ok: false, retryable: false, error: new HttpError(504, 'ai_timeout') };
+      return { ok: false, retryable: true, error: new HttpError(504, 'ai_timeout') };
     }
     return { ok: false, retryable: true, error: new HttpError(502, 'ai_unreachable') };
   } finally {

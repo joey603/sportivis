@@ -64,7 +64,7 @@ export type GeneratedProgram = {
 export async function generateProgramAi(
   request: ProgramRequest,
 ): Promise<GeneratedProgram> {
-  const { program, remaining } = await postWithRetry<{
+  const { program, remaining } = await post<{
     program: unknown;
     remaining: number;
   }>('/api/generate-program', {
@@ -122,7 +122,7 @@ export async function analyzeMealAi(
   clarifications?: MealClarificationAnswer[],
   options?: { assumeTypical?: boolean },
 ): Promise<AnalyzeMealResult> {
-  return postWithRetry<AnalyzeMealResult>('/api/analyze-meal', {
+  return post<AnalyzeMealResult>('/api/analyze-meal', {
     description,
     locale,
     clarifications: clarifications?.length ? clarifications : undefined,
@@ -157,35 +157,29 @@ export async function fetchAiQuota(feature: AiFeature): Promise<number | null> {
   return typeof data === 'number' ? data : null;
 }
 
-async function postWithRetry<T>(url: string, body: unknown): Promise<T> {
-  try {
-    return await post<T>(url, body);
-  } catch (reason) {
-    const code = aiErrorCode(reason);
-    if (
-      code !== 'ai_unreachable' &&
-      code !== 'ai_overloaded' &&
-      code !== 'ai_empty' &&
-      code !== 'ai_invalid_json' &&
-      code !== 'invalid_groq_key'
-    ) {
-      throw reason;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    return post<T>(url, body);
-  }
-}
-
 async function post<T>(url: string, body: unknown): Promise<T> {
   const token = await accessToken();
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 65_000);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (reason) {
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      throw new AiError('ai_timeout');
+    }
+    throw new AiError('ai_unreachable');
+  } finally {
+    clearTimeout(timer);
+  }
 
   const payload = (await response.json().catch(() => null)) as
     | (T & { error?: string })

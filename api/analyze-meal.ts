@@ -18,7 +18,7 @@ import {
 } from './_lib/http.js';
 import { consumeQuota } from './_lib/quota.js';
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 60 };
 
 const MEAL_SCHEMA: JsonSchema = {
   type: 'object',
