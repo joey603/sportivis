@@ -392,8 +392,9 @@ const fr = {
   'nutrition.configInvalid': 'Vérifie l’objectif et le nombre de séances (1–7).',
   'nutrition.clarifyTitle': 'Quelques précisions',
   'nutrition.clarifyHint':
-    'L’IA a un doute sur la décomposition. Réponds puis relance l’analyse.',
+    'L’IA a un doute. Réponds aux questions, ou ajoute sans précision avec une portion normale.',
   'nutrition.clarifySubmit': 'Valider et analyser',
+  'nutrition.clarifySkip': 'Ajoute sans précision',
   'nutrition.editHint':
     'Vérifie et corrige les aliments avant d’ajouter au journal.',
   'nutrition.mealLabel': 'Libellé du repas',
@@ -795,8 +796,9 @@ const he: Record<MessageKey, string> = {
   'nutrition.configInvalid': 'בדוק את המטרה ומספר האימונים (1–7).',
   'nutrition.clarifyTitle': 'כמה הבהרות',
   'nutrition.clarifyHint':
-    'ל-AI יש ספק בפירוק. ענה ואז הפעל שוב את הניתוח.',
+    'ל-AI יש ספק. ענה על השאלות, או הוסף בלי דיוק עם מנה רגילה.',
   'nutrition.clarifySubmit': 'אישור וניתוח',
+  'nutrition.clarifySkip': 'הוסף בלי דיוק',
   'nutrition.editHint': 'בדוק ותקן את המזונות לפני הוספה ליומן.',
   'nutrition.mealLabel': 'שם הארוחה',
   'nutrition.itemName': 'מזון',
