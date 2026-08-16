@@ -87,7 +87,9 @@ export function Exercises() {
             </div>
             <span className="badge">{localizeMuscle(ex.muscle, locale)}</span>
             {ex.custom && (
-              <span className="badge">{t('exercises.customBadge')}</span>
+              <span className="badge badge-pink">
+                {t('exercises.customBadge')}
+              </span>
             )}
             <span className="badge badge-accent">
               {localizeEquipment(ex.equipment, locale)}

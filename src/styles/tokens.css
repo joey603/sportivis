@@ -16,6 +16,8 @@
   --teal-dim: rgba(46, 196, 182, 0.15);
   --violet: #c9a6ff;
   --violet-dim: rgba(201, 166, 255, 0.15);
+  --pink: #ff8fc7;
+  --pink-dim: rgba(255, 143, 199, 0.15);
   --danger: #ff6b6b;
   --warning: #ffb347;
   --radius: 12px;
@@ -625,6 +627,12 @@ html[dir='rtl'] .brand {
   color: var(--accent);
 }
 
+/* Exercices créés par l'utilisateur : repérables parmi les badges. */
+.badge-pink {
+  background: var(--pink-dim);
+  color: var(--pink);
+}
+
 .row-actions {
   display: flex;
   flex-wrap: wrap;
@@ -970,8 +978,8 @@ html[dir='rtl'] .brand {
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--pink-dim);
+  color: var(--pink);
   font-weight: 700;
 }
 
@@ -1267,6 +1275,11 @@ html[dir='rtl'] .brand {
   transition: width 0.25s ease;
 }
 
+/* Rose pour les protéines : les distingue de la jauge de calories. */
+.goal-bar-protein {
+  background: var(--pink);
+}
+
 .goal-bar.over {
   background: var(--danger);
 }
@@ -1296,6 +1309,10 @@ html[dir='rtl'] .brand {
 
 .goal-macro-block {
   margin: 0.75rem 0 0.35rem;
+}
+
+.goal-macro-block .sheet-head strong {
+  color: var(--pink);
 }
 
 .sheet-head-sm {
@@ -1345,7 +1362,7 @@ html[dir='rtl'] .brand {
   display: block;
   margin-top: 0.25rem;
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--pink);
 }
 
 .meal-items {
@@ -1888,13 +1905,13 @@ html[dir='rtl'] .brand {
 }
 
 .weight-area {
-  fill: rgba(184, 242, 85, 0.1);
+  fill: rgba(255, 143, 199, 0.12);
   stroke: none;
 }
 
 .weight-line {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--pink);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1902,7 +1919,7 @@ html[dir='rtl'] .brand {
 
 .weight-point {
   fill: var(--bg-deep);
-  stroke: var(--accent);
+  stroke: var(--pink);
   stroke-width: 2.5;
 }
 
@@ -1972,7 +1989,7 @@ html[dir='rtl'] .brand {
 }
 
 .weight-table td:nth-child(2) {
-  color: var(--accent);
+  color: var(--pink);
   font-weight: 700;
 }
 
@@ -2014,7 +2031,7 @@ html[dir='rtl'] .brand {
   position: absolute;
   top: -0.7rem;
   right: 0.6rem;
-  color: rgba(184, 242, 85, 0.07);
+  color: rgba(255, 143, 199, 0.16);
   font-size: 5rem;
   font-weight: 800;
   line-height: 1;

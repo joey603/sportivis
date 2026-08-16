@@ -307,7 +307,9 @@ export function Nutrition() {
               >
                 <span
                   className={
-                    comparison.protein.over ? 'goal-bar over' : 'goal-bar'
+                    comparison.protein.over
+                      ? 'goal-bar over'
+                      : 'goal-bar goal-bar-protein'
                   }
                   style={{ width: `${comparison.protein.percent}%` }}
                 />

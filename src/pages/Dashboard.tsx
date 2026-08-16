@@ -186,7 +186,9 @@ export function Dashboard() {
               <div className="goal-track goal-track-sm">
                 <span
                   className={
-                    intake.protein.over ? 'goal-bar over' : 'goal-bar'
+                    intake.protein.over
+                      ? 'goal-bar over'
+                      : 'goal-bar goal-bar-protein'
                   }
                   style={{ width: `${intake.protein.percent}%` }}
                 />

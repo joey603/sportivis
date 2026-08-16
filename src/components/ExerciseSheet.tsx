@@ -97,7 +97,9 @@ export function ExerciseSheet({
                 {localizeEquipment(exercise.equipment, locale)}
               </span>
               {exercise.custom && (
-                <span className="badge">{t('exercises.customBadge')}</span>
+                <span className="badge badge-pink">
+                  {t('exercises.customBadge')}
+                </span>
               )}
               {exercise.defaultRestSec > 0 && (
                 <span className="badge">
