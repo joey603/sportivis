@@ -4,17 +4,13 @@ import { requireEnv } from './quota.js';
 /**
  * Client LLM via Groq (API compatible OpenAI).
  *
- * Pourquoi pas `openai/gpt-oss-120b` pour les programmes :
- * - plafond free ~8 000 TPM : le catalogue d'exercices (~4–5k tokens) + la
- *   réponse fait souvent dépasser → 413 « Request too large »
- * - le 120b est un modèle « reasoning » : sans `reasoning_effort: low` il
- *   brûle le budget tokens en réflexion et renvoie parfois un content vide
- * - certains comptes free reçoivent 403 sur le 120b, affiché à tort comme
- *   « non configuré »
+ * Programmes : `qwen/qwen3.6-27b` (remplacement recommandé du Llama 70B).
+ * Repas : `openai/gpt-oss-20b` (rapide, JSON stable).
  *
- * On reste donc sur `openai/gpt-oss-20b` (même famille, JSON stable, ~1000 t/s).
+ * On évite `openai/gpt-oss-120b` : plafond TPM free trop juste avec le
+ * catalogue d'exercices (413 / content vide / 403 selon le compte).
  */
-const DEFAULT_MODEL_PROGRAM = 'openai/gpt-oss-20b';
+const DEFAULT_MODEL_PROGRAM = 'qwen/qwen3.6-27b';
 const DEFAULT_MODEL_MEAL = 'openai/gpt-oss-20b';
 const TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 3;
@@ -27,7 +23,6 @@ const MODEL_ALIASES: Record<string, string> = {
   'llama-3.1-70b-versatile': DEFAULT_MODEL_PROGRAM,
   'llama3-70b-8192': DEFAULT_MODEL_PROGRAM,
   'llama3-8b-8192': DEFAULT_MODEL_MEAL,
-  // Trop lourd pour le tier gratuit avec notre catalogue programmes.
   'openai/gpt-oss-120b': DEFAULT_MODEL_PROGRAM,
 };
 
@@ -110,9 +105,9 @@ function buildRequestBody(
     ],
     response_format: { type: 'json_object' },
   };
-  // gpt-oss : sans ça le modèle « réfléchit » trop et peut renvoyer content vide.
-  if (model.includes('gpt-oss')) {
-    payload.reasoning_effort = 'low';
+  // gpt-oss / qwen3 : limiter le raisonnement pour garder du budget tokens JSON.
+  if (model.includes('gpt-oss') || model.includes('qwen3')) {
+    payload.reasoning_effort = model.includes('qwen3') ? 'none' : 'low';
   }
   return JSON.stringify(payload);
 }
