@@ -114,8 +114,9 @@ function requireClient() {
 }
 
 /**
- * `localProfile` sert de repli quand les colonnes nutrition ne sont pas encore
- * migrées : sans lui, un pull effacerait sexe/taille/objectif du localStorage.
+ * `localProfile` sert de repli quand le cloud a des champs nutrition vides
+ * (migration absente, upsert partiel, course à la connexion) : sans lui, un
+ * pull effacerait sexe / taille / objectif du localStorage.
  */
 export async function fetchCloudData(
   localProfile?: UserProfile,
@@ -162,10 +163,10 @@ export async function fetchCloudData(
     profileData = fallback.data
       ? {
           ...fallback.data,
-          sex: localProfile?.sex ?? null,
-          height_cm: localProfile?.heightCm ?? null,
-          goal: localProfile?.goal ?? null,
-          sessions_per_week: localProfile?.sessionsPerWeek ?? null,
+          sex: null,
+          height_cm: null,
+          goal: null,
+          sessions_per_week: null,
         }
       : null;
   }
@@ -207,7 +208,7 @@ export async function fetchCloudData(
   }));
 
   const profileRow = profileData as ProfileRow | null;
-  const profile: UserProfile | undefined = profileRow
+  const cloudProfile: UserProfile | undefined = profileRow
     ? {
         firstName: profileRow.first_name,
         lastName: profileRow.last_name,
@@ -232,6 +233,7 @@ export async function fetchCloudData(
             : undefined,
       }
     : undefined;
+  const profile = mergeProfiles(cloudProfile, localProfile);
   const weightEntries = (weightsRes.data as WeightEntryRow[]).map((row) => ({
     id: row.id,
     weightKg: Number(row.weight_kg),
@@ -252,6 +254,27 @@ export async function fetchCloudData(
     weightEntries,
     incomingProgramShares,
     meals,
+  };
+}
+
+/**
+ * Le cloud gagne sur le nom / âge (source de vérité compte), mais un champ
+ * nutrition local remplit les trous cloud (null) pour ne jamais les effacer.
+ */
+export function mergeProfiles(
+  cloud: UserProfile | undefined,
+  local: UserProfile | undefined,
+): UserProfile | undefined {
+  if (!cloud) return local;
+  if (!local) return cloud;
+  return {
+    firstName: cloud.firstName || local.firstName,
+    lastName: cloud.lastName || local.lastName,
+    age: cloud.age || local.age,
+    sex: cloud.sex ?? local.sex,
+    heightCm: cloud.heightCm ?? local.heightCm,
+    goal: cloud.goal ?? local.goal,
+    sessionsPerWeek: cloud.sessionsPerWeek ?? local.sessionsPerWeek,
   };
 }
 
@@ -383,19 +406,26 @@ export async function upsertProfileCloud(
   userId: string,
 ): Promise<void> {
   const client = requireClient();
-  const fullRow = {
+  // Ne pas envoyer null pour les champs optionnels absents : un upsert avec
+  // `goal: null` écrasait l’objectif déjà en base (ex. sauvegarde Compte).
+  const fullRow: Record<string, unknown> = {
     user_id: userId,
     first_name: profile.firstName,
     last_name: profile.lastName,
     age: profile.age,
-    sex: profile.sex ?? null,
-    height_cm: profile.heightCm ?? null,
-    goal: profile.goal ?? null,
-    sessions_per_week: profile.sessionsPerWeek ?? null,
     updated_at: new Date().toISOString(),
   };
+  if (profile.sex != null) fullRow.sex = profile.sex;
+  if (profile.heightCm != null) fullRow.height_cm = profile.heightCm;
+  if (profile.goal != null) fullRow.goal = profile.goal;
+  if (profile.sessionsPerWeek != null) {
+    fullRow.sessions_per_week = profile.sessionsPerWeek;
+  }
   const { error } = await client.from('profiles').upsert(fullRow);
-  if (!error) return;
+  if (!error) {
+    await mirrorProfileMetadata(profile);
+    return;
+  }
   if (!isMissingColumn(error)) throw error;
   const { error: fallbackError } = await client.from('profiles').upsert({
     user_id: userId,
@@ -405,6 +435,25 @@ export async function upsertProfileCloud(
     updated_at: new Date().toISOString(),
   });
   if (fallbackError) throw fallbackError;
+  await mirrorProfileMetadata(profile);
+}
+
+/** Garde une copie dans user_metadata (repli si la ligne profiles est incomplète). */
+async function mirrorProfileMetadata(profile: UserProfile): Promise<void> {
+  if (!supabase) return;
+  const data: Record<string, unknown> = {
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    age: profile.age,
+  };
+  if (profile.sex != null) data.sex = profile.sex;
+  if (profile.heightCm != null) data.height_cm = profile.heightCm;
+  if (profile.goal != null) data.goal = profile.goal;
+  if (profile.sessionsPerWeek != null) {
+    data.sessions_per_week = profile.sessionsPerWeek;
+  }
+  const { error } = await supabase.auth.updateUser({ data });
+  if (error) console.warn('[profile-metadata]', error.message);
 }
 
 export async function upsertWeightEntryCloud(

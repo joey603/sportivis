@@ -141,7 +141,7 @@ export function loadData(): AppData {
       programs: parsed.programs ?? [],
       sessions: parsed.sessions ?? [],
       customExercises: parsed.customExercises ?? [],
-      profile: parsed.profile,
+      profile: normalizeProfile(parsed.profile),
       weightEntries: parsed.weightEntries ?? [],
       incomingProgramShares: parsed.incomingProgramShares ?? [],
       meals: parsed.meals ?? [],
@@ -149,6 +149,48 @@ export function loadData(): AppData {
   } catch {
     return defaultData();
   }
+}
+
+function normalizeProfile(raw: unknown): UserProfile | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as Partial<UserProfile>;
+  const firstName =
+    typeof value.firstName === 'string' ? value.firstName.trim() : '';
+  const lastName =
+    typeof value.lastName === 'string' ? value.lastName.trim() : '';
+  const age = Number(value.age);
+  if (!firstName || !lastName || !Number.isInteger(age)) return undefined;
+
+  const sex =
+    value.sex === 'male' || value.sex === 'female' ? value.sex : undefined;
+  const heightCm = Number(value.heightCm);
+  const goal =
+    value.goal === 'masse' ||
+    value.goal === 'perte' ||
+    value.goal === 'force' ||
+    value.goal === 'endurance' ||
+    value.goal === 'forme'
+      ? value.goal
+      : undefined;
+  const sessionsPerWeek = Number(value.sessionsPerWeek);
+
+  return {
+    firstName,
+    lastName,
+    age,
+    sex,
+    heightCm:
+      Number.isFinite(heightCm) && heightCm >= 120 && heightCm <= 250
+        ? heightCm
+        : undefined,
+    goal,
+    sessionsPerWeek:
+      Number.isInteger(sessionsPerWeek) &&
+      sessionsPerWeek >= 1 &&
+      sessionsPerWeek <= 7
+        ? sessionsPerWeek
+        : undefined,
+  };
 }
 
 export function saveData(data: AppData): void {
@@ -257,7 +299,7 @@ export function importData(json: string): AppData {
     programs: parsed.programs,
     sessions: parsed.sessions,
     customExercises: parsed.customExercises ?? [],
-    profile: parsed.profile,
+    profile: normalizeProfile(parsed.profile),
     weightEntries: parsed.weightEntries ?? [],
     incomingProgramShares: parsed.incomingProgramShares ?? [],
     meals: parsed.meals ?? [],

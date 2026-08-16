@@ -10,6 +10,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 import {
   fetchCloudData,
+  mergeProfiles,
   pushAllData,
   upsertProfileCloud,
   upsertWeightEntryCloud,
@@ -18,7 +19,7 @@ import { setCloudUserId } from '../lib/cloudUser';
 import { clearSettings, saveBodyWeightKg } from '../lib/calories';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { clearLocalData, loadData, saveData } from '../lib/storage';
-import type { BiologicalSex, UserProfile, WeightEntry } from '../types';
+import type { BiologicalSex, NutritionGoal, UserProfile, WeightEntry } from '../types';
 
 export type SignUpDetails = Omit<UserProfile, 'sex' | 'heightCm'> & {
   weightKg: number;
@@ -92,7 +93,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSyncing(true);
       setError(null);
       try {
-        const cloud = await fetchCloudData(loadData().profile);
+        const local = loadData();
+        const seed = mergeProfiles(
+          local.profile,
+          profileFromUserMetadata(user!),
+        );
+        if (seed && seed !== local.profile) {
+          local.profile = seed;
+          saveData(local);
+        }
+
+        const cloud = await fetchCloudData(seed);
         if (cancelled) return;
         const hasCloud =
           cloud.programs.length > 0 ||
@@ -108,6 +119,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           window.dispatchEvent(new Event('sportivis-data'));
         } else {
           await pushAllData(loadData(), user!.id);
+        }
+
+        // Réécrit sexe / taille / objectif au cloud s’ils ne venaient que du
+        // local ou des metadata (sinon la prochaine connexion les redemandait).
+        const healed = loadData().profile;
+        if (healed) {
+          await upsertProfileCloud(healed, user!.id);
         }
       } catch (err) {
         if (!cancelled) {
@@ -140,6 +158,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string, details: SignUpDetails) => {
       if (!supabase) throw new Error('Supabase non configuré');
       setError(null);
+
+      const profile: UserProfile = {
+        firstName: details.firstName,
+        lastName: details.lastName,
+        age: details.age,
+        sex: details.sex,
+        heightCm: details.heightCm,
+        goal: details.goal,
+        sessionsPerWeek: details.sessionsPerWeek,
+      };
+      const weightEntry: WeightEntry = {
+        id: crypto.randomUUID(),
+        weightKg: details.weightKg,
+        recordedAt: new Date().toISOString(),
+      };
+      // Écrit le profil local AVANT signUp : onAuthStateChange peut hydrater
+      // avant la fin de cette fonction, et doit déjà voir sexe / taille.
+      const local = loadData();
+      local.profile = profile;
+      local.weightEntries = [weightEntry];
+      saveData(local);
+      saveBodyWeightKg(details.weightKg);
+
       const { data, error: err } = await supabase.auth.signUp({
         email,
         password,
@@ -158,25 +199,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('La connexion directe doit être activée dans Supabase.');
       }
 
-      const profile: UserProfile = {
-        firstName: details.firstName,
-        lastName: details.lastName,
-        age: details.age,
-        sex: details.sex,
-        heightCm: details.heightCm,
-        goal: details.goal,
-        sessionsPerWeek: details.sessionsPerWeek,
-      };
-      const weightEntry: WeightEntry = {
-        id: crypto.randomUUID(),
-        weightKg: details.weightKg,
-        recordedAt: new Date().toISOString(),
-      };
-      const local = loadData();
-      local.profile = profile;
-      local.weightEntries = [weightEntry];
-      saveData(local);
-      saveBodyWeightKg(details.weightKg);
       await Promise.all([
         upsertProfileCloud(profile, data.user.id),
         upsertWeightEntryCloud(weightEntry, data.user.id),
@@ -216,10 +238,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSyncing(true);
     setError(null);
     try {
-      const cloud = await fetchCloudData(loadData().profile);
+      const local = loadData();
+      const seed = mergeProfiles(
+        local.profile,
+        user ? profileFromUserMetadata(user) : undefined,
+      );
+      const cloud = await fetchCloudData(seed);
       saveData(cloud);
       const latestWeight = cloud.weightEntries.at(-1);
       if (latestWeight) saveBodyWeightKg(latestWeight.weightKg);
+      if (cloud.profile && user) {
+        await upsertProfileCloud(cloud.profile, user.id);
+      }
       window.dispatchEvent(new Event('sportivis-data'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Échec du téléchargement');
@@ -227,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [user]);
 
   const value = useMemo(
     () => ({
@@ -266,3 +296,47 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+/** Champs saisis à l’inscription et stockés dans user_metadata Supabase. */
+function profileFromUserMetadata(user: User): UserProfile | undefined {
+  const meta = user.user_metadata ?? {};
+  const firstName =
+    typeof meta.first_name === 'string' ? meta.first_name.trim() : '';
+  const lastName =
+    typeof meta.last_name === 'string' ? meta.last_name.trim() : '';
+  const age = Number(meta.age);
+  if (!firstName || !lastName || !Number.isInteger(age)) return undefined;
+
+  const sex: BiologicalSex | undefined =
+    meta.sex === 'male' || meta.sex === 'female' ? meta.sex : undefined;
+  const heightRaw = Number(meta.height_cm);
+  const heightCm =
+    Number.isFinite(heightRaw) && heightRaw >= 120 && heightRaw <= 250
+      ? heightRaw
+      : undefined;
+  const goal = parseNutritionGoal(meta.goal);
+  const sessionsRaw = Number(meta.sessions_per_week);
+  const sessionsPerWeek =
+    Number.isInteger(sessionsRaw) && sessionsRaw >= 1 && sessionsRaw <= 7
+      ? sessionsRaw
+      : undefined;
+
+  return {
+    firstName,
+    lastName,
+    age,
+    sex,
+    heightCm,
+    goal,
+    sessionsPerWeek,
+  };
+}
+
+function parseNutritionGoal(value: unknown): NutritionGoal | undefined {
+  return value === 'masse' ||
+    value === 'perte' ||
+    value === 'force' ||
+    value === 'endurance' ||
+    value === 'forme'
+    ? value
+    : undefined;
+}
