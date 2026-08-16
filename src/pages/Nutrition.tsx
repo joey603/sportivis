@@ -18,7 +18,17 @@ import {
 } from '../lib/nutritionGoals';
 import { addMeal, deleteMeal, mealsOfDay, saveProfile } from '../lib/storage';
 import { useAppData } from '../lib/useAppData';
+import type { MessageKey } from '../i18n/messages';
 import type { NutritionGoal } from '../types';
+
+/** Titre déduit de l'heure du repas, indépendant de la langue. */
+function mealTimeKey(eatenAt: string): MessageKey {
+  const hour = new Date(eatenAt).getHours();
+  if (hour >= 5 && hour < 11) return 'nutrition.meal.breakfast';
+  if (hour >= 11 && hour < 15) return 'nutrition.meal.lunch';
+  if (hour >= 18 && hour < 23) return 'nutrition.meal.dinner';
+  return 'nutrition.meal.snack';
+}
 
 export function Nutrition() {
   const { locale, t } = useI18n();
@@ -432,11 +442,12 @@ export function Nutrition() {
               {todayMeals.map((meal) => (
                 <li key={meal.id}>
                   <div>
-                    <strong>{meal.label}</strong>
+                    <strong>{t(mealTimeKey(meal.eatenAt))}</strong>
                     <span className="muted">
                       {' '}
                       · {timeFormat.format(new Date(meal.eatenAt))}
                     </span>
+                    <div className="meal-log-label">{meal.label}</div>
                     <div className="muted meal-macros">
                       {numberFormat.format(meal.kcal)} {t('units.kcal')} ·{' '}
                       {t('nutrition.protein')}{' '}

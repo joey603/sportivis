@@ -1367,6 +1367,13 @@ html[dir='rtl'] .brand {
   font-size: 0.82rem;
 }
 
+/* Aliment décrit, sous le titre déduit de l'heure (petit déjeuner, dîner…). */
+.meal-log-label {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
 .meal-log {
   margin: 0.35rem 0 0.85rem;
   padding: 0;

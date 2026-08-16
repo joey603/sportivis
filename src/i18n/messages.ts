@@ -349,6 +349,10 @@ const fr = {
   'nutrition.deleteMeal': 'Supprimer le repas {label}',
   'nutrition.mealsCount': '{count} repas',
   'nutrition.mealsCount_plural': '{count} repas',
+  'nutrition.meal.breakfast': 'Petit déjeuner',
+  'nutrition.meal.lunch': 'Déjeuner',
+  'nutrition.meal.snack': 'Collation',
+  'nutrition.meal.dinner': 'Dîner',
   'nutrition.itemQuantity': '{quantity} · {kcal} kcal',
   'nutrition.globalTitle': 'Objectif global',
   'nutrition.globalHint':
@@ -725,6 +729,10 @@ const he: Record<MessageKey, string> = {
   'nutrition.deleteMeal': 'מחיקת הארוחה {label}',
   'nutrition.mealsCount': 'ארוחה אחת',
   'nutrition.mealsCount_plural': '{count} ארוחות',
+  'nutrition.meal.breakfast': 'ארוחת בוקר',
+  'nutrition.meal.lunch': 'ארוחת צהריים',
+  'nutrition.meal.snack': 'חטיף',
+  'nutrition.meal.dinner': 'ארוחת ערב',
   'nutrition.itemQuantity': '{quantity} · {kcal} קלוריות',
   'nutrition.globalTitle': 'מטרה כללית',
   'nutrition.globalHint':
