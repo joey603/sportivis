@@ -188,17 +188,20 @@ async function requestOnce<T>(
       };
     }
     if (response.status === 401) {
-      console.error('[groq]', groqMessage);
-      const looksLikeBadKey = /api[_ ]?key|unauthorized|invalid|authentication/i.test(
-        groqMessage || 'api key',
-      );
+      console.error('[groq] 401', model, groqMessage || '(empty)');
+      // Message vide / ambigu : souvent un 401 transitoire côté gateway, pas
+      // une clé Vercel cassée (surtout si /api/ai-status répond déjà OK).
+      if (isClearInvalidApiKey(groqMessage)) {
+        return {
+          ok: false,
+          retryable: false,
+          error: new HttpError(503, 'invalid_groq_key'),
+        };
+      }
       return {
         ok: false,
-        retryable: false,
-        error: new HttpError(
-          503,
-          looksLikeBadKey ? 'invalid_groq_key' : 'ai_unreachable',
-        ),
+        retryable: true,
+        error: new HttpError(503, 'ai_unreachable'),
       };
     }
     if (response.status === 403) {
@@ -253,6 +256,14 @@ function extractJsonText(message: GroqMessage | undefined): string {
   const end = reasoning.lastIndexOf('}');
   if (start >= 0 && end > start) return reasoning.slice(start, end + 1);
   return '';
+}
+
+/** Vrai seulement si Groq dit clairement que la clé est mauvaise. */
+function isClearInvalidApiKey(message: string): boolean {
+  if (!message.trim()) return false;
+  return /invalid\s+api\s+key|incorrect\s+api\s+key|wrong\s+api\s+key|api[_ ]?key[_ ]?(is[_ ]?)?(invalid|required|missing)|authentication[_ ]?failed|invalid[_ ]?credentials/i.test(
+    message,
+  );
 }
 
 function delay(ms: number): Promise<void> {
