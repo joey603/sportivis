@@ -4,6 +4,7 @@ import { ExercisePicker } from '../components/ExercisePicker';
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
 import { ImportProgram } from '../components/ImportProgram';
+import { useI18n } from '../i18n/I18nContext';
 import type { ImportedProgram } from '../lib/programExchange';
 import {
   createId,
@@ -21,6 +22,7 @@ const WORK_TIME_OPTIONS = [
 ];
 
 export function ProgramEditor() {
+  const { t } = useI18n();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isDraft = id === 'nouveau';
@@ -211,16 +213,13 @@ export function ProgramEditor() {
             className="btn btn-ghost btn-sm"
             onClick={() => setImportOpen(true)}
           >
-            Importer (ChatGPT)
+            {t('import.chatgpt')}
           </button>
         </div>
       </div>
 
       {program.exercises.length === 0 && (
-        <p className="empty">
-          Ajoute des exercices depuis la bibliothèque, ou colle un programme
-          généré par ChatGPT avec « Importer ».
-        </p>
+        <p className="empty">{t('import.emptyHint')}</p>
       )}
 
       {program.exercises.map((pe, index) => {

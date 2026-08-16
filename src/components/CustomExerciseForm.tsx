@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '../data/exercises';
+import {
+  localizeEquipment,
+  localizeMuscle,
+  localizeTracking,
+} from '../i18n/exercises';
+import { useI18n } from '../i18n/I18nContext';
 import { createId, saveCustomExercise } from '../lib/storage';
 import type {
   Equipment,
@@ -14,6 +20,7 @@ type Props = {
 };
 
 export function CustomExerciseForm({ onCreated, onClose }: Props) {
+  const { locale, t } = useI18n();
   const [name, setName] = useState('');
   const [muscle, setMuscle] = useState<MuscleGroup>('full_body');
   const [equipment, setEquipment] = useState<Equipment>('autre');
@@ -50,38 +57,38 @@ export function CustomExerciseForm({ onCreated, onClose }: Props) {
         className="modal"
         onClick={(event) => event.stopPropagation()}
         onSubmit={submit}
-        aria-label="Créer un exercice personnel"
+        aria-label={t('custom.aria')}
       >
         <div className="sheet-head">
           <div>
-            <h2>Créer mon exercice</h2>
-            <p className="muted">Il sera enregistré sans photo sur cet appareil.</p>
+            <h2>{t('custom.title')}</h2>
+            <p className="muted">{t('custom.lead')}</p>
           </div>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t('common.close')}
           >
             ✕
           </button>
         </div>
 
         <div className="field">
-          <label htmlFor="custom-name">Nom de l’exercice</label>
+          <label htmlFor="custom-name">{t('custom.name')}</label>
           <input
             id="custom-name"
             autoFocus
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Ex. Tirage de ma salle"
+            placeholder={t('custom.namePlaceholder')}
           />
         </div>
 
         <div className="form-grid">
           <div className="field">
-            <label htmlFor="custom-muscle">Groupe musculaire</label>
+            <label htmlFor="custom-muscle">{t('custom.muscle')}</label>
             <select
               id="custom-muscle"
               value={muscle}
@@ -89,14 +96,14 @@ export function CustomExerciseForm({ onCreated, onClose }: Props) {
             >
               {MUSCLE_GROUPS.map((item) => (
                 <option key={item} value={item}>
-                  {item.replace(/_/g, ' ')}
+                  {localizeMuscle(item, locale)}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="field">
-            <label htmlFor="custom-equipment">Équipement</label>
+            <label htmlFor="custom-equipment">{t('custom.equipment')}</label>
             <select
               id="custom-equipment"
               value={equipment}
@@ -104,14 +111,14 @@ export function CustomExerciseForm({ onCreated, onClose }: Props) {
             >
               {EQUIPMENT_TYPES.map((item) => (
                 <option key={item} value={item}>
-                  {item.replace(/_/g, ' ')}
+                  {localizeEquipment(item, locale)}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="field">
-            <label htmlFor="custom-tracking">Type de suivi</label>
+            <label htmlFor="custom-tracking">{t('custom.tracking')}</label>
             <select
               id="custom-tracking"
               value={tracking}
@@ -119,14 +126,18 @@ export function CustomExerciseForm({ onCreated, onClose }: Props) {
                 setTracking(event.target.value as TrackingType)
               }
             >
-              <option value="reps">Répétitions</option>
-              <option value="duration">Durée</option>
-              <option value="distance">Distance</option>
+              <option value="reps">{localizeTracking('reps', locale)}</option>
+              <option value="duration">
+                {localizeTracking('duration', locale)}
+              </option>
+              <option value="distance">
+                {localizeTracking('distance', locale)}
+              </option>
             </select>
           </div>
 
           <div className="field">
-            <label htmlFor="custom-rest">Repos par défaut (s)</label>
+            <label htmlFor="custom-rest">{t('custom.rest')}</label>
             <input
               id="custom-rest"
               type="number"
@@ -138,24 +149,22 @@ export function CustomExerciseForm({ onCreated, onClose }: Props) {
         </div>
 
         <div className="field">
-          <label htmlFor="custom-instructions">
-            Consignes personnelles (une par ligne)
-          </label>
+          <label htmlFor="custom-instructions">{t('custom.instructions')}</label>
           <textarea
             id="custom-instructions"
             rows={4}
             value={instructions}
             onChange={(event) => setInstructions(event.target.value)}
-            placeholder={'Régler le siège à hauteur de poitrine\nGarder le dos droit'}
+            placeholder={t('custom.instructionsPlaceholder')}
           />
         </div>
 
         <div className="row-actions">
           <button type="submit" className="btn btn-primary">
-            Ajouter l’exercice
+            {t('custom.submit')}
           </button>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Annuler
+            {t('common.cancel')}
           </button>
         </div>
       </form>

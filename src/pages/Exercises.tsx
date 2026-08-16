@@ -7,9 +7,17 @@ import {
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
 import { ExportExercises } from '../components/ExportExercises';
+import {
+  localizeEquipment,
+  localizeExerciseName,
+  localizeMuscle,
+  localizeTracking,
+} from '../i18n/exercises';
+import { useI18n } from '../i18n/I18nContext';
 import { getAllExercises } from '../lib/storage';
 
 export function Exercises() {
+  const { locale, t } = useI18n();
   const [openId, setOpenId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -23,12 +31,8 @@ export function Exercises() {
     <div>
       <header className="page-header">
         <div>
-          <h1>Bibliothèque</h1>
-          <p>
-            {exerciseCount} exercices — machines, haltères, barre, poulie, poids
-            du corps et cardio. Touche un exercice pour voir la démonstration et
-            les consignes.
-          </p>
+          <h1>{t('exercises.title')}</h1>
+          <p>{t('exercises.subtitle', { count: exerciseCount })}</p>
         </div>
         <div className="row-actions">
           <button
@@ -36,14 +40,14 @@ export function Exercises() {
             className="btn btn-primary"
             onClick={() => setCreateOpen(true)}
           >
-            + Ajouter mon exercice
+            {t('exercises.addCustom')}
           </button>
           <button
             type="button"
             className="btn btn-secondary"
             onClick={() => setExportOpen(true)}
           >
-            Exporter les exercices
+            {t('exercises.export')}
           </button>
         </div>
       </header>
@@ -51,7 +55,9 @@ export function Exercises() {
       <ExerciseFilters {...filters} />
 
       <p className="muted" style={{ marginBottom: '0.75rem', fontSize: '0.9rem' }}>
-        {results.length} résultat{results.length > 1 ? 's' : ''}
+        {t(results.length === 1 ? 'exercises.result' : 'exercises.results', {
+          count: results.length,
+        })}
       </p>
 
       <div className="exercise-list">
@@ -62,27 +68,35 @@ export function Exercises() {
             className="exercise-row exercise-row-clickable"
             onClick={() => setOpenId(ex.id)}
           >
-            <ExerciseThumb exerciseId={ex.id} name={ex.name} />
+            <ExerciseThumb
+              exerciseId={ex.id}
+              name={localizeExerciseName(ex, locale)}
+            />
             <div className="exercise-row-main">
-              <div className="name">{ex.name}</div>
+              <div className="name">{localizeExerciseName(ex, locale)}</div>
               <div className="muted" style={{ fontSize: '0.8rem', marginTop: '0.15rem' }}>
-                Repos défaut {ex.defaultRestSec}s · suivi{' '}
-                {ex.tracking === 'reps'
-                  ? 'reps'
-                  : ex.tracking === 'duration'
-                    ? 'durée'
-                    : 'distance'}
-                {ex.custom ? ' · exercice personnel' : ''}
+                {t('exercises.defaultRest', {
+                  seconds: ex.defaultRestSec,
+                })}{' '}
+                ·{' '}
+                {t('exercises.tracking', {
+                  tracking: localizeTracking(ex.tracking, locale),
+                })}
+                {ex.custom ? ` · ${t('exercises.custom')}` : ''}
               </div>
             </div>
-            <span className="badge">{ex.muscle}</span>
-            {ex.custom && <span className="badge">personnel</span>}
+            <span className="badge">{localizeMuscle(ex.muscle, locale)}</span>
+            {ex.custom && (
+              <span className="badge">{t('exercises.customBadge')}</span>
+            )}
             <span className="badge badge-accent">
-              {ex.equipment.replace(/_/g, ' ')}
+              {localizeEquipment(ex.equipment, locale)}
             </span>
           </button>
         ))}
-        {results.length === 0 && <p className="empty">Aucun exercice trouvé</p>}
+        {results.length === 0 && (
+          <p className="empty">{t('exercises.empty')}</p>
+        )}
       </div>
 
       {openId && (

@@ -3,6 +3,7 @@ import type {
   Exercise,
   Program,
   ProgramShare,
+  SentProgramShare,
   Session,
   UserProfile,
   WeightEntry,
@@ -326,6 +327,31 @@ export async function shareProgramCloud(
     p_recipient_email: recipientEmail.trim().toLowerCase(),
   });
   if (error) throw error;
+}
+
+export async function fetchSentProgramSharesCloud(
+  programId: string,
+): Promise<SentProgramShare[]> {
+  const client = requireClient();
+  const { data, error } = await client.rpc('list_sent_program_shares', {
+    p_program_id: programId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as {
+    id: string;
+    recipient_name: string;
+    recipient_email: string;
+    status: SentProgramShare['status'];
+    created_at: string;
+    responded_at: string | null;
+  }[]).map((row) => ({
+    id: row.id,
+    recipientName: row.recipient_name,
+    recipientEmail: row.recipient_email,
+    status: row.status,
+    createdAt: row.created_at,
+    respondedAt: row.responded_at ?? undefined,
+  }));
 }
 
 export async function respondToProgramShareCloud(

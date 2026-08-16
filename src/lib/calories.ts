@@ -121,6 +121,26 @@ function intensityFactor(
 }
 
 /**
+ * Estimation de l'énergie dépensée pendant une série, hors temps de repos.
+ * Un chiffre après la virgule évite d'afficher 0 pour les séries courtes.
+ */
+export function setCaloriesKcal(
+  set: SetLog,
+  exercise: Exercise | undefined,
+  bodyWeightKg = loadSettings().bodyWeightKg,
+): number {
+  const weight =
+    bodyWeightKg > 0 ? bodyWeightKg : DEFAULT_BODY_WEIGHT_KG;
+  const seconds = setWorkSeconds(set, exercise);
+  const kcal =
+    exerciseMet(exercise) *
+    intensityFactor(set, weight, exercise) *
+    weight *
+    (seconds / 3600);
+  return Math.max(0, Math.round(kcal * 10) / 10);
+}
+
+/**
  * Estimation des calories brûlées pour une séance.
  * Formule de base : kcal = MET × poids (kg) × durée (h).
  */

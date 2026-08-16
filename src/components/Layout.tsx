@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
 import { isSupabaseConfigured } from '../lib/supabase';
-
-const privateLinks = [
-  { to: '/accueil', label: 'Accueil' },
-  { to: '/exercices', label: 'Exercices' },
-  { to: '/programmes', label: 'Programmes' },
-  { to: '/historique', label: 'Historique' },
-  { to: '/compte', label: 'Compte' },
-];
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function Layout() {
   const auth = useAuth();
+  const { t } = useI18n();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const signedIn = !isSupabaseConfigured || Boolean(auth.user);
   const brandTo = signedIn ? '/accueil' : '/connexion';
+
+  const privateLinks = [
+    { to: '/accueil', label: t('nav.home') },
+    { to: '/exercices', label: t('nav.exercises') },
+    { to: '/programmes', label: t('nav.programs') },
+    { to: '/historique', label: t('nav.history') },
+    { to: '/compte', label: t('nav.account') },
+  ];
 
   useEffect(() => {
     setMenuOpen(false);
@@ -28,7 +31,6 @@ export function Layout() {
       if (event.key === 'Escape') setMenuOpen(false);
     }
     window.addEventListener('keydown', onKeyDown);
-    // Empêche le défilement de la page derrière le panneau ouvert.
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
@@ -39,26 +41,28 @@ export function Layout() {
 
   return (
     <div className="app-shell">
-      {/* Hors session il ne reste qu'un lien : le menu latéral serait inutile. */}
       <header className={signedIn ? 'top-nav nav-collapsible' : 'top-nav'}>
         <NavLink to={brandTo} className="brand">
           Sporti<span>vis</span>
         </NavLink>
 
-        {signedIn && (
-          <button
-            type="button"
-            className={menuOpen ? 'nav-toggle open' : 'nav-toggle'}
-            aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
-            aria-expanded={menuOpen}
-            aria-controls="nav-menu"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
-        )}
+        <div className="nav-tools">
+          <LanguageSwitcher />
+          {signedIn && (
+            <button
+              type="button"
+              className={menuOpen ? 'nav-toggle open' : 'nav-toggle'}
+              aria-label={menuOpen ? t('nav.menuClose') : t('nav.menuOpen')}
+              aria-expanded={menuOpen}
+              aria-controls="nav-menu"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          )}
+        </div>
 
         {menuOpen && (
           <div
@@ -71,7 +75,7 @@ export function Layout() {
         <nav
           id="nav-menu"
           className={menuOpen ? 'nav-links open' : 'nav-links'}
-          aria-label="Navigation principale"
+          aria-label={t('nav.main')}
         >
           {signedIn &&
             privateLinks.map((l) => (
@@ -88,7 +92,7 @@ export function Layout() {
               to="/connexion"
               className={({ isActive }) => (isActive ? 'active' : undefined)}
             >
-              Connexion
+              {t('nav.login')}
             </NavLink>
           )}
           {isSupabaseConfigured && auth.user && (
@@ -98,7 +102,7 @@ export function Layout() {
                 className="btn btn-ghost btn-sm"
                 onClick={() => void auth.signOut()}
               >
-                Déconnexion
+                {t('nav.logout')}
               </button>
             </div>
           )}

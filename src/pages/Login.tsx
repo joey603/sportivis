@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
 import { isSupabaseConfigured } from '../lib/supabase';
 
 type Mode = 'signin' | 'signup';
 
 export function Login() {
   const auth = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { from?: string; mode?: Mode } | null;
@@ -27,7 +29,7 @@ export function Login() {
       <div>
         <header className="page-header">
           <div>
-            <h1>Connexion</h1>
+            <h1>{t('login.title')}</h1>
             <p>Supabase n’est pas configuré.</p>
           </div>
         </header>
@@ -77,21 +79,18 @@ export function Login() {
         <h1>
           Sporti<em>vis</em>
         </h1>
-        <p className="lead">
-          Connecte-toi pour accéder à tes exercices, tes programmes et ton
-          historique, synchronisés sur tous tes appareils.
-        </p>
+        <p className="lead">{t('login.lead')}</p>
       </section>
 
       <form className="panel auth-card" onSubmit={submit}>
         <h2 style={{ fontSize: '1.15rem', marginBottom: '1rem' }}>
-          {mode === 'signin' ? 'Se connecter' : 'Créer un compte'}
+          {mode === 'signin' ? t('login.signin') : t('login.signup')}
         </h2>
 
         {mode === 'signup' && (
           <div className="auth-profile-fields">
             <div className="field">
-              <label htmlFor="signup-first-name">Prénom</label>
+              <label htmlFor="signup-first-name">{t('account.firstName')}</label>
               <input
                 id="signup-first-name"
                 autoComplete="given-name"
@@ -101,7 +100,7 @@ export function Login() {
               />
             </div>
             <div className="field">
-              <label htmlFor="signup-last-name">Nom</label>
+              <label htmlFor="signup-last-name">{t('account.lastName')}</label>
               <input
                 id="signup-last-name"
                 autoComplete="family-name"
@@ -111,7 +110,7 @@ export function Login() {
               />
             </div>
             <div className="field">
-              <label htmlFor="signup-age">Âge</label>
+              <label htmlFor="signup-age">{t('account.age')}</label>
               <input
                 id="signup-age"
                 type="number"
@@ -123,7 +122,7 @@ export function Login() {
               />
             </div>
             <div className="field">
-              <label htmlFor="signup-weight">Poids (kg)</label>
+              <label htmlFor="signup-weight">{t('account.weight')}</label>
               <input
                 id="signup-weight"
                 type="number"
@@ -139,7 +138,7 @@ export function Login() {
         )}
 
         <div className="field">
-          <label htmlFor="login-email">Email</label>
+          <label htmlFor="login-email">{t('login.email')}</label>
           <input
             id="login-email"
             type="email"
@@ -151,7 +150,7 @@ export function Login() {
         </div>
 
         <div className="field">
-          <label htmlFor="login-password">Mot de passe</label>
+          <label htmlFor="login-password">{t('login.password')}</label>
           <input
             id="login-password"
             type="password"
@@ -171,7 +170,11 @@ export function Login() {
 
         <div className="row-actions">
           <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? '…' : mode === 'signin' ? 'Se connecter' : 'Créer mon compte'}
+            {busy
+              ? t('login.busy')
+              : mode === 'signin'
+                ? t('login.signin')
+                : t('login.signup')}
           </button>
           <button
             type="button"
@@ -182,7 +185,7 @@ export function Login() {
               setMessage(null);
             }}
           >
-            {mode === 'signin' ? 'Pas encore de compte ?' : 'J’ai déjà un compte'}
+            {mode === 'signin' ? t('login.noAccount') : t('login.hasAccount')}
           </button>
         </div>
       </form>

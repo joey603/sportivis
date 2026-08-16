@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useI18n } from '../i18n/I18nContext';
+import { intlLocale } from '../i18n/messages';
 import {
   clearSettings,
   loadSettings,
@@ -13,16 +15,18 @@ import {
   sessionVolumeKg,
 } from '../lib/storage';
 import { useAppData } from '../lib/useAppData';
+import type { Locale } from '../i18n/messages';
 import type { WeightEntry } from '../types';
 
-const DAY_LABELS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const DAY_LABELS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const DAY_LABELS_HE = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
 
 function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-function formatSessionDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
+function formatSessionDate(iso: string, locale: Locale): string {
+  return new Date(iso).toLocaleDateString(intlLocale(locale), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -30,10 +34,13 @@ function formatSessionDate(iso: string): string {
 }
 
 export function Dashboard() {
+  const { t, locale } = useI18n();
   const [data, setData] = useAppData();
   const [newWeight, setNewWeight] = useState('');
   const [weightError, setWeightError] = useState<string | null>(null);
   const bodyWeightKg = loadSettings().bodyWeightKg;
+  const dayLabels = locale === 'he' ? DAY_LABELS_HE : DAY_LABELS_FR;
+  const numberLocale = intlLocale(locale);
 
   const summary = useMemo(() => {
     const sessions = data.sessions
@@ -49,7 +56,7 @@ export function Dashboard() {
       date.setDate(today.getDate() - (6 - index));
       return {
         key: dayKey(date),
-        label: DAY_LABELS[date.getDay()],
+        label: dayLabels[date.getDay()],
         date: date.getDate(),
         sessions: 0,
       };
@@ -85,7 +92,7 @@ export function Dashboard() {
         0,
       ),
     };
-  }, [data.sessions, bodyWeightKg]);
+  }, [data.sessions, bodyWeightKg, dayLabels]);
 
   const lastSession = summary.sessions[0];
   const maxDaySessions = Math.max(1, ...summary.days.map((day) => day.sessions));
@@ -94,7 +101,7 @@ export function Dashboard() {
     event.preventDefault();
     const value = Number(newWeight.replace(',', '.'));
     if (!Number.isFinite(value) || value < 30 || value > 300) {
-      setWeightError('Indique un poids entre 30 et 300 kg.');
+      setWeightError(t('account.weightInvalid'));
       return;
     }
     saveBodyWeightKg(value);
@@ -115,39 +122,41 @@ export function Dashboard() {
     <div className="dashboard">
       <header className="dashboard-header">
         <div>
-          <p className="dashboard-kicker">Ton espace sportif</p>
+          <p className="dashboard-kicker">{t('dashboard.kicker')}</p>
           <h1>
             {data.profile?.firstName
-              ? `Bonjour ${data.profile.firstName}`
-              : 'Tableau de bord'}
+              ? t('dashboard.hello', { name: data.profile.firstName })
+              : t('dashboard.title')}
           </h1>
-          <p className="muted">Choisis un programme et continue ta progression.</p>
+          <p className="muted">{t('dashboard.lead')}</p>
         </div>
         <Link to="/programmes" className="btn btn-secondary">
-          Gérer mes programmes
+          {t('dashboard.managePrograms')}
         </Link>
       </header>
 
-      <section className="dashboard-stats" aria-label="Résumé de l'activité">
+      <section className="dashboard-stats" aria-label={t('dashboard.activity')}>
         <article className="dashboard-stat">
-          <span>Cette semaine</span>
+          <span>{t('dashboard.week')}</span>
           <strong>{summary.weekCount}</strong>
-          <small>séance{summary.weekCount > 1 ? 's' : ''}</small>
+          <small>{t('dashboard.sessions').toLowerCase()}</small>
         </article>
         <article className="dashboard-stat">
-          <span>Temps total</span>
+          <span>{t('dashboard.totalTime')}</span>
           <strong>{summary.totalMinutes}</strong>
-          <small>minutes entraînées</small>
+          <small>{t('dashboard.totalTimeHint')}</small>
         </article>
         <article className="dashboard-stat">
-          <span>Volume total</span>
-          <strong>{Math.round(summary.totalVolume).toLocaleString('fr-FR')}</strong>
-          <small>kg soulevés</small>
+          <span>{t('dashboard.totalVolume')}</span>
+          <strong>
+            {Math.round(summary.totalVolume).toLocaleString(numberLocale)}
+          </strong>
+          <small>{t('dashboard.totalVolumeHint')}</small>
         </article>
         <article className="dashboard-stat">
-          <span>Calories</span>
-          <strong>{summary.weekCalories.toLocaleString('fr-FR')}</strong>
-          <small>kcal cette semaine</small>
+          <span>{t('dashboard.calories')}</span>
+          <strong>{summary.weekCalories.toLocaleString(numberLocale)}</strong>
+          <small>{t('dashboard.caloriesHint')}</small>
         </article>
       </section>
 
@@ -155,26 +164,31 @@ export function Dashboard() {
         slides={[
           {
             id: 'overview',
-            label: 'Séances',
+            label: t('dashboard.sessions'),
             content: (
               <div className="dashboard-grid">
                 <section className="panel dashboard-activity">
                   <div className="dashboard-section-title">
                     <div>
-                      <h2>Activité récente</h2>
-                      <p className="muted">Tes séances sur les 7 derniers jours</p>
+                      <h2>{t('dashboard.activity')}</h2>
+                      <p className="muted">{t('dashboard.week')}</p>
                     </div>
                     <strong>{summary.weekCount}</strong>
                   </div>
                   <div
                     className="activity-chart"
-                    aria-label="Séances des sept derniers jours"
+                    aria-label={t('dashboard.activityChart')}
                   >
                     {summary.days.map((day) => (
                       <div
                         className="activity-day"
                         key={day.key}
-                        title={`${day.sessions} séance${day.sessions > 1 ? 's' : ''}`}
+                        title={t(
+                          day.sessions > 1
+                            ? 'dashboard.daySessions_plural'
+                            : 'dashboard.daySessions',
+                          { count: day.sessions },
+                        )}
                       >
                         <span className="activity-value">{day.sessions || ''}</span>
                         <div className="activity-track">
@@ -199,46 +213,46 @@ export function Dashboard() {
                 <section className="panel dashboard-last">
                   <div className="dashboard-section-title">
                     <div>
-                      <h2>Dernière séance</h2>
-                      <p className="muted">Ton dernier effort enregistré</p>
+                      <h2>{t('dashboard.lastSession')}</h2>
+                      <p className="muted">{t('dashboard.noSession')}</p>
                     </div>
                   </div>
                   {lastSession ? (
                     <>
                       <h3>{lastSession.programName}</h3>
                       <p className="muted dashboard-last-date">
-                        {formatSessionDate(lastSession.startedAt)}
+                        {formatSessionDate(lastSession.startedAt, locale)}
                       </p>
                       <div className="dashboard-last-metrics">
                         <div>
                           <strong>{sessionDurationMin(lastSession) ?? 0}</strong>
-                          <span>min</span>
+                          <span>{t('units.min')}</span>
                         </div>
                         <div>
                           <strong>
                             {sessionCaloriesKcal(
                               lastSession,
                               bodyWeightKg,
-                            ).toLocaleString('fr-FR')}
+                            ).toLocaleString(numberLocale)}
                           </strong>
-                          <span>kcal</span>
+                          <span>{t('units.kcal')}</span>
                         </div>
                         <div>
                           <strong>
                             {Math.round(
                               sessionVolumeKg(lastSession),
-                            ).toLocaleString('fr-FR')}
+                            ).toLocaleString(numberLocale)}
                           </strong>
-                          <span>kg</span>
+                          <span>{t('weight.kg')}</span>
                         </div>
                       </div>
                       <Link to="/historique" className="btn btn-ghost btn-sm">
-                        Voir l’historique
+                        {t('nav.history')}
                       </Link>
                     </>
                   ) : (
                     <p className="empty dashboard-empty">
-                      Termine ta première séance pour voir tes statistiques.
+                      {t('dashboard.noSession')}
                     </p>
                   )}
                 </section>
@@ -247,19 +261,20 @@ export function Dashboard() {
           },
           {
             id: 'weight',
-            label: 'Poids',
+            label: t('dashboard.weight'),
             content: (
               <section className="panel weight-tracker">
                 <div className="dashboard-section-title">
                   <div>
-                    <h2>Suivi du poids</h2>
-                    <p className="muted">
-                      Ajoute régulièrement une mesure pour voir ton évolution.
-                    </p>
+                    <h2>{t('dashboard.weightTracking')}</h2>
+                    <p className="muted">{t('dashboard.weightHint')}</p>
                   </div>
                   {data.weightEntries.at(-1) && (
                     <strong>
-                      {data.weightEntries.at(-1)?.weightKg.toLocaleString('fr-FR')} kg
+                      {data.weightEntries
+                        .at(-1)
+                        ?.weightKg.toLocaleString(numberLocale)}{' '}
+                      {t('weight.kg')}
                     </strong>
                   )}
                 </div>
@@ -280,11 +295,11 @@ export function Dashboard() {
       <section className="dashboard-programs">
         <div className="dashboard-section-title">
           <div>
-            <h2>Mes programmes</h2>
-            <p className="muted">Prêt à commencer ? Lance directement ta séance.</p>
+            <h2>{t('dashboard.programs')}</h2>
+            <p className="muted">{t('programs.subtitle')}</p>
           </div>
           <Link to="/programmes" className="btn btn-ghost btn-sm">
-            Tout voir
+            {t('nav.programs')}
           </Link>
         </div>
 
@@ -297,8 +312,12 @@ export function Dashboard() {
                 </span>
                 <h3>{program.name}</h3>
                 <p className="muted">
-                  {program.exercises.length} exercice
-                  {program.exercises.length > 1 ? 's' : ''}
+                  {t(
+                    program.exercises.length > 1
+                      ? 'programs.exerciseCount_plural'
+                      : 'programs.exerciseCount',
+                    { count: program.exercises.length },
+                  )}
                   {program.description ? ` · ${program.description}` : ''}
                 </p>
                 <div className="row-actions">
@@ -306,13 +325,13 @@ export function Dashboard() {
                     to={`/seance/${program.id}`}
                     className="btn btn-primary btn-sm"
                   >
-                    Lancer
+                    {t('dashboard.launch')}
                   </Link>
                   <Link
                     to={`/programmes/${program.id}`}
                     className="btn btn-ghost btn-sm"
                   >
-                    Modifier
+                    {t('dashboard.edit')}
                   </Link>
                 </div>
               </article>
@@ -320,12 +339,10 @@ export function Dashboard() {
           </div>
         ) : (
           <div className="panel dashboard-empty">
-            <h3>Crée ton premier programme</h3>
-            <p className="muted">
-              Ajoute tes exercices, séries, répétitions et temps de repos.
-            </p>
+            <h3>{t('programs.empty')}</h3>
+            <p className="muted">{t('programs.subtitle')}</p>
             <Link to="/programmes/nouveau" className="btn btn-primary">
-              Créer un programme
+              {t('common.create')}
             </Link>
           </div>
         )}
@@ -343,6 +360,7 @@ type Slide = {
 const SLIDE_DURATION_MS = 8000;
 
 function DashboardCarousel({ slides }: { slides: Slide[] }) {
+  const { t } = useI18n();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -366,7 +384,7 @@ function DashboardCarousel({ slides }: { slides: Slide[] }) {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
       aria-roledescription="carrousel"
-      aria-label="Statistiques d'entraînement"
+      aria-label={t('dashboard.carousel')}
     >
       <div className="carousel-body" key={active.id}>
         {active.content}
@@ -379,7 +397,7 @@ function DashboardCarousel({ slides }: { slides: Slide[] }) {
             type="button"
             className={slideIndex === index ? 'carousel-dot active' : 'carousel-dot'}
             onClick={() => setIndex(slideIndex)}
-            aria-label={`Afficher ${slide.label}`}
+            aria-label={t('dashboard.showSlide', { label: slide.label })}
             aria-current={slideIndex === index ? 'true' : undefined}
           >
             <span className="carousel-dot-track">
@@ -416,6 +434,8 @@ function WeightTracker({
   onSubmit: (event: React.FormEvent) => void;
   onDelete: (id: string) => void;
 }) {
+  const { locale, t } = useI18n();
+  const numberLocale = intlLocale(locale);
   const points = entries.slice(-10);
   const values = points.map((entry) => entry.weightKg);
   const rawMin = values.length ? Math.min(...values) : 0;
@@ -458,7 +478,7 @@ function WeightTracker({
             <svg
               viewBox={`0 0 ${box.width} ${box.height}`}
               role="img"
-              aria-label="Courbe d'évolution du poids"
+              aria-label={t('weight.chart')}
             >
               {gridValues.map((value, index) => {
                 const y = plot.top + (index / (gridValues.length - 1)) * plotHeight;
@@ -489,14 +509,14 @@ function WeightTracker({
                 <g key={entry.id}>
                   <circle cx={x} cy={y} r="4.5" className="weight-point" />
                   <text x={x} y={y - 12} className="weight-value">
-                    {entry.weightKg.toLocaleString('fr-FR')}
+                    {entry.weightKg.toLocaleString(numberLocale)}
                   </text>
                   <text
                     x={x}
                     y={box.height - 10}
                     className="weight-date"
                   >
-                    {new Date(entry.recordedAt).toLocaleDateString('fr-FR', {
+                    {new Date(entry.recordedAt).toLocaleDateString(numberLocale, {
                       day: '2-digit',
                       month: '2-digit',
                     })}
@@ -505,16 +525,14 @@ function WeightTracker({
               ))}
             </svg>
           ) : (
-            <p className="empty">
-              Ajoute ta première pesée pour commencer la courbe.
-            </p>
+            <p className="empty">{t('weight.emptyChart')}</p>
           )}
         </div>
 
         <div className="weight-side">
           <form className="weight-form" onSubmit={onSubmit}>
             <div className="field">
-              <label htmlFor="dashboard-weight">Poids du jour (kg)</label>
+              <label htmlFor="dashboard-weight">{t('weight.today')}</label>
               <input
                 id="dashboard-weight"
                 type="number"
@@ -524,11 +542,11 @@ function WeightTracker({
                 required
                 value={newWeight}
                 onChange={(e) => setNewWeight(e.target.value)}
-                placeholder="Ex. 74,5"
+                placeholder={t('weight.placeholder')}
               />
             </div>
             <button type="submit" className="btn btn-primary btn-sm">
-              Ajouter
+              {t('weight.add')}
             </button>
             {error && <p className="weight-error">{error}</p>}
           </form>
@@ -538,8 +556,8 @@ function WeightTracker({
               <table className="weight-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Poids</th>
+                    <th>{t('weight.date')}</th>
+                    <th>{t('weight.value')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -547,20 +565,25 @@ function WeightTracker({
                   {[...entries].reverse().slice(0, 6).map((entry) => (
                     <tr key={entry.id}>
                       <td>
-                        {new Date(entry.recordedAt).toLocaleDateString('fr-FR', {
-                          day: '2-digit',
-                          month: 'short',
-                        })}
+                        {new Date(entry.recordedAt).toLocaleDateString(
+                          numberLocale,
+                          { day: '2-digit', month: 'short' },
+                        )}
                       </td>
-                      <td>{entry.weightKg.toLocaleString('fr-FR')} kg</td>
+                      <td>
+                        {entry.weightKg.toLocaleString(numberLocale)}{' '}
+                        {t('weight.kg')}
+                      </td>
                       <td>
                         <button
                           type="button"
                           className="weight-delete"
                           onClick={() => onDelete(entry.id)}
-                          aria-label={`Supprimer la pesée du ${new Date(
-                            entry.recordedAt,
-                          ).toLocaleDateString('fr-FR')}`}
+                          aria-label={t('weight.deleteEntry', {
+                            date: new Date(
+                              entry.recordedAt,
+                            ).toLocaleDateString(numberLocale),
+                          })}
                         >
                           ×
                         </button>

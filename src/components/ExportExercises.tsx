@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import { copyToClipboard } from '../lib/clipboard';
 import { buildChatGptPrompt } from '../lib/programExchange';
 import type { Exercise } from '../types';
@@ -9,13 +10,17 @@ type Props = {
 };
 
 export function ExportExercises({ exercises, onClose }: Props) {
-  const prompt = useMemo(() => buildChatGptPrompt(exercises), [exercises]);
+  const { locale, t } = useI18n();
+  const prompt = useMemo(
+    () => buildChatGptPrompt(exercises, locale),
+    [exercises, locale],
+  );
   const [copied, setCopied] = useState(false);
 
   async function copy() {
     const ok = await copyToClipboard(prompt);
     setCopied(ok);
-    if (!ok) window.alert('Copie impossible : sélectionne le texte manuellement.');
+    if (!ok) window.alert(t('export.copyFail'));
   }
 
   function download() {
@@ -34,29 +39,25 @@ export function ExportExercises({ exercises, onClose }: Props) {
         className="modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
-        aria-label="Exporter les exercices"
+        aria-label={t('export.title')}
       >
         <div className="sheet-head">
           <div>
-            <h2>Exporter les exercices</h2>
+            <h2>{t('export.title')}</h2>
             <p className="muted">
-              Colle ce texte dans ChatGPT : il contient la liste des{' '}
-              {exercises.length} exercices et le format de réponse attendu.
+              {t('export.lead', { count: exercises.length })}
             </p>
           </div>
         </div>
 
         <ol className="exchange-steps">
-          <li>Copie le texte ci-dessous et envoie-le à ChatGPT.</li>
-          <li>Précise ton objectif, ton niveau et le nombre de séances.</li>
-          <li>
-            Copie sa réponse JSON, puis dans <strong>Programmes → Créer</strong>{' '}
-            utilise <strong>Importer</strong>.
-          </li>
+          <li>{t('export.step1')}</li>
+          <li>{t('export.step2')}</li>
+          <li>{t('export.step3')}</li>
         </ol>
 
         <div className="field">
-          <label htmlFor="export-prompt">Texte à copier</label>
+          <label htmlFor="export-prompt">{t('export.label')}</label>
           <textarea
             id="export-prompt"
             className="exchange-text"
@@ -69,13 +70,13 @@ export function ExportExercises({ exercises, onClose }: Props) {
 
         <div className="row-actions">
           <button type="button" className="btn btn-primary" onClick={copy}>
-            {copied ? 'Copié ✓' : 'Copier'}
+            {copied ? t('export.copied') : t('export.copy')}
           </button>
           <button type="button" className="btn btn-secondary" onClick={download}>
-            Télécharger .txt
+            {t('export.download')}
           </button>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Fermer
+            {t('common.close')}
           </button>
         </div>
       </div>

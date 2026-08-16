@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react';
 import { EQUIPMENT_TYPES, MUSCLE_GROUPS } from '../data/exercises';
+import {
+  localizeEquipment,
+  localizeExerciseName,
+  localizeMuscle,
+} from '../i18n/exercises';
+import { useI18n } from '../i18n/I18nContext';
 import { searchAllExercises, type ExerciseCategory } from '../lib/storage';
 
 type CategoryValue = '' | ExerciseCategory;
 
-const CATEGORIES: { value: CategoryValue; label: string }[] = [
-  { value: '', label: 'Toutes catégories' },
-  { value: 'library', label: 'Bibliothèque' },
-  { value: 'custom', label: 'Mes exercices' },
-];
+const CATEGORIES: CategoryValue[] = ['', 'library', 'custom'];
 
 type State = {
   query: string;
@@ -25,20 +27,47 @@ const EMPTY: State = { query: '', muscle: '', equipment: '', category: '' };
  * La valeur déjà sélectionnée reste toujours proposée pour ne pas la perdre.
  */
 export function useExerciseFilters(libraryVersion = 0) {
+  const { locale } = useI18n();
   const [state, setState] = useState<State>(EMPTY);
   const { query, muscle, equipment, category } = state;
 
   const value = useMemo(
-    () => ({
-      results: searchAllExercises(
-        query,
+    () => {
+      function search(
+        muscleValue?: string,
+        equipmentValue?: string,
+        categoryValue?: ExerciseCategory,
+      ) {
+        const pool = searchAllExercises(
+          '',
+          muscleValue,
+          equipmentValue,
+          categoryValue,
+        );
+        const normalizedQuery = query.trim().toLocaleLowerCase(
+          locale === 'he' ? 'he-IL' : 'fr-FR',
+        );
+        if (!normalizedQuery) return pool;
+
+        return pool.filter((exercise) =>
+          [
+            exercise.name,
+            localizeExerciseName(exercise, locale),
+            localizeMuscle(exercise.muscle, locale),
+            localizeEquipment(exercise.equipment, locale),
+            ...(exercise.tags ?? []),
+          ].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)),
+        );
+      }
+
+      return {
+      results: search(
         muscle || undefined,
         equipment || undefined,
         category || undefined,
       ),
       muscles: (() => {
-        const pool = searchAllExercises(
-          query,
+        const pool = search(
           undefined,
           equipment || undefined,
           category || undefined,
@@ -48,8 +77,7 @@ export function useExerciseFilters(libraryVersion = 0) {
         );
       })(),
       equipments: (() => {
-        const pool = searchAllExercises(
-          query,
+        const pool = search(
           muscle || undefined,
           undefined,
           category || undefined,
@@ -59,23 +87,23 @@ export function useExerciseFilters(libraryVersion = 0) {
         );
       })(),
       categories: (() => {
-        const pool = searchAllExercises(
-          query,
+        const pool = search(
           muscle || undefined,
           equipment || undefined,
         );
         return CATEGORIES.filter(
           (item) =>
-            item.value === '' ||
-            item.value === category ||
+            item === '' ||
+            item === category ||
             pool.some((e) =>
-              item.value === 'custom' ? e.custom : !e.custom,
+              item === 'custom' ? e.custom : !e.custom,
             ),
         );
       })(),
-    }),
+    };
+    },
     // libraryVersion force le recalcul après création d'un exercice personnel.
-    [query, muscle, equipment, category, libraryVersion],
+    [query, muscle, equipment, category, libraryVersion, locale],
   );
 
   function setField<K extends keyof State>(key: K, next: State[K]) {
@@ -100,13 +128,20 @@ export function ExerciseFilters({
   categories,
   setField,
   autoFocus,
-  placeholder = 'Rechercher un exercice…',
+  placeholder,
 }: Props) {
+  const { locale, t } = useI18n();
+  const categoryLabels: Record<CategoryValue, string> = {
+    '': t('exercises.allCategories'),
+    library: t('exercises.library'),
+    custom: t('exercises.mine'),
+  };
+
   return (
     <div className="filters">
       <input
         autoFocus={autoFocus}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('exercises.search')}
         value={query}
         onChange={(e) => setField('query', e.target.value)}
       />
@@ -116,11 +151,11 @@ export function ExerciseFilters({
         <select
           value={category}
           onChange={(e) => setField('category', e.target.value as CategoryValue)}
-          aria-label="Catégorie"
+          aria-label={t('exercises.category')}
         >
           {categories.map((item) => (
-            <option key={item.label} value={item.value}>
-              {item.label}
+            <option key={item} value={item}>
+              {categoryLabels[item]}
             </option>
           ))}
         </select>
@@ -128,24 +163,24 @@ export function ExerciseFilters({
       <select
         value={muscle}
         onChange={(e) => setField('muscle', e.target.value)}
-        aria-label="Groupe musculaire"
+        aria-label={t('exercises.muscleGroup')}
       >
-        <option value="">Tous muscles</option>
+        <option value="">{t('exercises.allMuscles')}</option>
         {muscles.map((item) => (
           <option key={item} value={item}>
-            {item.replace(/_/g, ' ')}
+            {localizeMuscle(item, locale)}
           </option>
         ))}
       </select>
       <select
         value={equipment}
         onChange={(e) => setField('equipment', e.target.value)}
-        aria-label="Équipement"
+        aria-label={t('exercises.equipment')}
       >
-        <option value="">Tout équipement</option>
+        <option value="">{t('exercises.allEquipment')}</option>
         {equipments.map((item) => (
           <option key={item} value={item}>
-            {item.replace(/_/g, ' ')}
+            {localizeEquipment(item, locale)}
           </option>
         ))}
       </select>

@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { EXERCISE_MEDIA } from '../data/exerciseMedia';
 import { getGuide } from '../data/exerciseGuides';
+import {
+  localizeEquipment,
+  localizeExerciseName,
+  localizeMuscle,
+} from '../i18n/exercises';
+import { useI18n } from '../i18n/I18nContext';
 import { getExerciseById } from '../lib/storage';
 import { ExercisePictogram } from './ExercisePictogram';
 
@@ -14,6 +20,7 @@ export function ExerciseFrames({
   playing: boolean;
   alt: string;
 }) {
+  const { t } = useI18n();
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -31,12 +38,14 @@ export function ExerciseFrames({
         <img
           key={src}
           src={src}
-          alt={`${alt} — position ${i + 1}`}
+          alt={`${alt} — ${t('exercises.position', { number: i + 1 })}`}
           loading="lazy"
           className={i === frame ? 'on' : ''}
         />
       ))}
-      <span className="frames-tag mono">{frame === 0 ? 'départ' : 'arrivée'}</span>
+      <span className="frames-tag mono">
+        {t(frame === 0 ? 'exercises.start' : 'exercises.end')}
+      </span>
     </div>
   );
 }
@@ -48,12 +57,16 @@ export function ExerciseSheet({
   exerciseId: string;
   onClose: () => void;
 }) {
+  const { locale, t } = useI18n();
   const [playing, setPlaying] = useState(true);
   const exercise = getExerciseById(exerciseId);
+  const localizedName = exercise
+    ? localizeExerciseName(exercise, locale)
+    : '';
   const media = EXERCISE_MEDIA[exerciseId];
   const cues = exercise?.instructions?.length
     ? exercise.instructions
-    : getGuide(exerciseId);
+    : getGuide(exerciseId, locale);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -71,19 +84,27 @@ export function ExerciseSheet({
         className="modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label={exercise.name}
+        aria-label={localizedName}
       >
         <div className="sheet-head">
           <div>
-            <h2>{exercise.name}</h2>
+            <h2>{localizedName}</h2>
             <div className="sheet-badges">
-              <span className="badge">{exercise.muscle}</span>
-              <span className="badge badge-accent">
-                {exercise.equipment.replace(/_/g, ' ')}
+              <span className="badge">
+                {localizeMuscle(exercise.muscle, locale)}
               </span>
-              {exercise.custom && <span className="badge">personnel</span>}
+              <span className="badge badge-accent">
+                {localizeEquipment(exercise.equipment, locale)}
+              </span>
+              {exercise.custom && (
+                <span className="badge">{t('exercises.customBadge')}</span>
+              )}
               {exercise.defaultRestSec > 0 && (
-                <span className="badge">repos {exercise.defaultRestSec}s</span>
+                <span className="badge">
+                  {t('exercises.rest', {
+                    seconds: exercise.defaultRestSec,
+                  })}
+                </span>
               )}
             </div>
           </div>
@@ -91,7 +112,7 @@ export function ExerciseSheet({
             type="button"
             className="btn btn-ghost btn-sm"
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t('common.close')}
           >
             ✕
           </button>
@@ -102,7 +123,7 @@ export function ExerciseSheet({
             <ExerciseFrames
               images={media.images}
               playing={playing}
-              alt={exercise.name}
+              alt={localizedName}
             />
             <div className="row-actions" style={{ marginTop: '0.6rem' }}>
               <button
@@ -110,17 +131,17 @@ export function ExerciseSheet({
                 className="btn btn-secondary btn-sm"
                 onClick={() => setPlaying((p) => !p)}
               >
-                {playing ? 'Pause' : 'Animer'}
+                {t(playing ? 'exercises.pause' : 'exercises.animate')}
               </button>
             </div>
           </>
         ) : (
-          <ExercisePictogram label={exercise.name} />
+          <ExercisePictogram label={localizedName} />
         )}
 
         {cues.length > 0 && (
           <div className="cues">
-            <h3>Comment l&apos;exécuter</h3>
+            <h3>{t('exercises.howTo')}</h3>
             <ol>
               {cues.map((c) => (
                 <li key={c}>{c}</li>
@@ -131,7 +152,7 @@ export function ExerciseSheet({
 
         {media && (
           <p className="credit muted">
-            Photos :{' '}
+            {t('exercises.photos')} :{' '}
             <a
               href="https://github.com/yuhonas/free-exercise-db"
               target="_blank"

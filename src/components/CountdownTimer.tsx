@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 
 type Props = {
   seconds: number;
@@ -15,6 +16,7 @@ export function CountdownTimer({
   onDone,
   onSkip,
 }: Props) {
+  const { t } = useI18n();
   const [left, setLeft] = useState(seconds);
   const [paused, setPaused] = useState(false);
   const remainingRef = useRef(seconds);
@@ -70,7 +72,7 @@ export function CountdownTimer({
               letterSpacing: '0.06em',
             }}
           >
-            {paused ? `${label} — en pause` : label}
+            {paused ? t('workout.paused', { label }) : label}
           </div>
           <div className="time">
             {m}:{s.toString().padStart(2, '0')}
@@ -82,10 +84,10 @@ export function CountdownTimer({
             className="btn btn-primary"
             onClick={() => setPaused((p) => !p)}
           >
-            {paused ? '▶ Reprendre' : '⏸ Pause'}
+            {paused ? t('workout.resume') : t('workout.pause')}
           </button>
           <button type="button" className="btn btn-secondary" onClick={onSkip}>
-            Passer
+            {t('workout.skip')}
           </button>
         </div>
       </div>

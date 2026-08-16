@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import { copyToClipboard } from '../lib/clipboard';
 import {
   buildChatGptPrompt,
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function ImportProgram({ currentCount, onImport, onClose }: Props) {
+  const { locale, t } = useI18n();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -40,7 +42,9 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
   }
 
   async function copyPrompt() {
-    const ok = await copyToClipboard(buildChatGptPrompt(getAllExercises()));
+    const ok = await copyToClipboard(
+      buildChatGptPrompt(getAllExercises(), locale),
+    );
     setPromptCopied(ok);
   }
 
@@ -50,27 +54,27 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
         className="modal"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
-        aria-label="Importer un programme"
+        aria-label={t('import.title')}
       >
         <div className="sheet-head">
           <div>
-            <h2>Importer un programme</h2>
-            <p className="muted">
-              Colle la réponse de ChatGPT : les exercices, séries, reps et repos
-              sont remplis automatiquement. Le plus sûr est d’utiliser le bouton
-              « Copier » du bloc de code, pour n’oublier aucune accolade.
-            </p>
+            <h2>{t('import.title')}</h2>
+            <p className="muted">{t('import.lead')}</p>
           </div>
         </div>
 
         <div className="row-actions" style={{ marginBottom: '0.85rem' }}>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={copyPrompt}>
-            {promptCopied ? 'Consigne copiée ✓' : 'Copier la consigne ChatGPT'}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={copyPrompt}
+          >
+            {promptCopied ? t('import.promptCopied') : t('import.copyPrompt')}
           </button>
         </div>
 
         <div className="field">
-          <label htmlFor="import-json">Programme (JSON)</label>
+          <label htmlFor="import-json">{t('import.json')}</label>
           <textarea
             id="import-json"
             className="exchange-text"
@@ -81,7 +85,7 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
               setText(event.target.value);
               setError(null);
             }}
-            placeholder={'{\n  "name": "Ma séance",\n  "exercises": [ … ]\n}'}
+            placeholder={'{\n  "name": "…",\n  "exercises": [ … ]\n}'}
           />
         </div>
 
@@ -89,8 +93,10 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
 
         {imported !== null && (
           <p className="exchange-success">
-            {imported} exercice{imported > 1 ? 's' : ''} importé
-            {imported > 1 ? 's' : ''}.
+            {t(
+              imported > 1 ? 'import.doneCount_plural' : 'import.doneCount',
+              { count: imported },
+            )}
           </p>
         )}
 
@@ -110,7 +116,7 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
                 className="btn btn-primary"
                 onClick={() => run('replace')}
               >
-                {currentCount > 0 ? 'Remplacer les exercices' : 'Importer'}
+                {currentCount > 0 ? t('import.replace') : t('import.action')}
               </button>
               {currentCount > 0 && (
                 <button
@@ -118,16 +124,16 @@ export function ImportProgram({ currentCount, onImport, onClose }: Props) {
                   className="btn btn-secondary"
                   onClick={() => run('append')}
                 >
-                  Ajouter à la suite
+                  {t('import.append')}
                 </button>
               )}
               <button type="button" className="btn btn-ghost" onClick={onClose}>
-                Annuler
+                {t('common.cancel')}
               </button>
             </>
           ) : (
             <button type="button" className="btn btn-primary" onClick={onClose}>
-              Terminé
+              {t('common.done')}
             </button>
           )}
         </div>

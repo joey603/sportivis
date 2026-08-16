@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import { loadSettings, sessionCaloriesKcal } from '../lib/calories';
 import {
   deleteSession,
@@ -9,14 +10,15 @@ import {
 import { useAppData } from '../lib/useAppData';
 import type { Session } from '../types';
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('fr-FR', {
+function formatDate(iso: string, locale: string): string {
+  return new Date(iso).toLocaleString(locale === 'he' ? 'he-IL' : 'fr-FR', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
 }
 
 export function History() {
+  const { t, locale } = useI18n();
   const [data, setData] = useAppData();
   const [openId, setOpenId] = useState<string | null>(null);
   const bodyWeightKg = loadSettings().bodyWeightKg;
@@ -24,7 +26,7 @@ export function History() {
   const sessions = data.sessions.filter((s) => s.endedAt);
 
   function onDelete(id: string) {
-    if (!confirm('Supprimer cette séance ?')) return;
+    if (!confirm(t('history.deleteConfirm'))) return;
     setData(deleteSession(id));
     if (openId === id) setOpenId(null);
   }
@@ -33,16 +35,18 @@ export function History() {
     <div>
       <header className="page-header">
         <div>
-          <h1>Historique</h1>
+          <h1>{t('history.title')}</h1>
           <p>
-            {sessions.length} séance{sessions.length > 1 ? 's' : ''} enregistrée
-            {sessions.length > 1 ? 's' : ''}.
+            {t(
+              sessions.length > 1 ? 'history.subtitle_plural' : 'history.subtitle',
+              { count: sessions.length },
+            )}
           </p>
         </div>
       </header>
 
       {sessions.length === 0 && (
-        <p className="empty">Pas encore de séance terminée. Lance un programme !</p>
+        <p className="empty">{t('history.empty')}</p>
       )}
 
       {sessions.map((s) => (
@@ -51,6 +55,8 @@ export function History() {
           session={s}
           bodyWeightKg={bodyWeightKg}
           open={openId === s.id}
+          locale={locale}
+          deleteLabel={t('common.delete')}
           onToggle={() => setOpenId(openId === s.id ? null : s.id)}
           onDelete={() => onDelete(s.id)}
         />
@@ -63,12 +69,16 @@ function SessionCard({
   session,
   bodyWeightKg,
   open,
+  locale,
+  deleteLabel,
   onToggle,
   onDelete,
 }: {
   session: Session;
   bodyWeightKg: number;
   open: boolean;
+  locale: string;
+  deleteLabel: string;
   onToggle: () => void;
   onDelete: () => void;
 }) {
@@ -85,15 +95,15 @@ function SessionCard({
       <button
         type="button"
         onClick={onToggle}
-        style={{ width: '100%', textAlign: 'left' }}
+        style={{ width: '100%', textAlign: 'start' }}
       >
         <h3>{session.programName}</h3>
         <p className="meta">
-          {formatDate(session.startedAt)}
+          {formatDate(session.startedAt, locale)}
           {duration != null ? ` · ${duration} min` : ''}
           {calories > 0 ? ` · ${calories} kcal` : ''}
-          {volume > 0 ? ` · ${volume} kg volume` : ''}
-          {` · ${completedSets} séries`}
+          {volume > 0 ? ` · ${volume} kg` : ''}
+          {` · ${completedSets}`}
         </p>
       </button>
 
@@ -115,7 +125,7 @@ function SessionCard({
                       className="muted mono"
                       style={{ fontSize: '0.85rem' }}
                     >
-                      Série {set.setIndex + 1}
+                      #{set.setIndex + 1}
                       {set.weightKg != null ? ` · ${set.weightKg} kg` : ''}
                       {set.reps != null ? ` × ${set.reps}` : ''}
                       {set.durationSec != null ? ` · ${set.durationSec}s` : ''}
@@ -127,7 +137,7 @@ function SessionCard({
             );
           })}
           <button type="button" className="btn btn-danger btn-sm" onClick={onDelete}>
-            Supprimer
+            {deleteLabel}
           </button>
         </div>
       )}

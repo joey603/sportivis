@@ -4,6 +4,9 @@ import { CountdownTimer } from '../components/CountdownTimer';
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
 import { SetRow } from '../components/SetRow';
+import { localizeExerciseName } from '../i18n/exercises';
+import { useI18n } from '../i18n/I18nContext';
+import { loadSettings, setCaloriesKcal } from '../lib/calories';
 import {
   createId,
   exerciseWorkSeconds,
@@ -55,6 +58,7 @@ function initialPhase(program: Program | undefined): Phase | null {
 }
 
 export function Workout() {
+  const { locale, t } = useI18n();
   const { programId } = useParams<{ programId: string }>();
   const navigate = useNavigate();
   const program = useMemo(
@@ -79,13 +83,14 @@ export function Workout() {
   const [phase, setPhase] = useState<Phase | null>(() => initialPhase(program));
   const [sheetId, setSheetId] = useState<string | null>(null);
   const phaseKey = useRef(1);
+  const bodyWeightKg = loadSettings().bodyWeightKg;
 
   if (!program || !session) {
     return (
       <div>
-        <p className="empty">Programme introuvable.</p>
+        <p className="empty">{t('workout.missing')}</p>
         <Link to="/programmes" className="btn btn-ghost">
-          Retour
+          {t('common.back')}
         </Link>
       </div>
     );
@@ -98,6 +103,7 @@ export function Workout() {
   const log = logs[activeIndex];
   const ex = pe ? getExerciseById(pe.exerciseId) : undefined;
   const workSec = pe ? exerciseWorkSeconds(pe) : null;
+  const localizedName = ex ? localizeExerciseName(ex, locale) : '';
 
   function nextPosition(from: Position): Position | null {
     const current = prog.exercises[from.exerciseIndex];
@@ -222,16 +228,27 @@ export function Workout() {
     navigate('/accueil');
   }
 
-  const doneCount = logs.reduce(
-    (acc, l) => acc + l.sets.filter((s) => s.completed).length,
-    0,
-  );
   const totalSets = logs.reduce((acc, l) => acc + l.sets.length, 0);
+  const setsBeforeActive = prog.exercises
+    .slice(0, activeIndex)
+    .reduce((total, item) => total + item.sets, 0);
+  const activeSetIndex =
+    phase?.exerciseIndex === activeIndex
+      ? phase.setIndex
+      : firstPendingSet(activeIndex);
+  const currentStep = totalSets
+    ? Math.min(totalSets, setsBeforeActive + activeSetIndex + 1)
+    : 0;
 
   const phaseSets = phase ? prog.exercises[phase.exerciseIndex]?.sets : undefined;
   const phaseLabel = phase
-    ? `${phase.kind === 'work' ? 'Effort' : 'Repos'}${
-        phaseSets ? ` · série ${phase.setIndex + 1}/${phaseSets}` : ''
+    ? `${t(phase.kind === 'work' ? 'workout.effort' : 'workout.rest')}${
+        phaseSets
+          ? ` · ${t('workout.setOf', {
+              current: phase.setIndex + 1,
+              total: phaseSets,
+            })}`
+          : ''
       }`
     : '';
 
@@ -241,8 +258,12 @@ export function Workout() {
         <div>
           <h1>{prog.name}</h1>
           <p>
-            Séance en cours · {doneCount}/{totalSets} séries · exercice{' '}
-            {activeIndex + 1}/{prog.exercises.length}
+            {t('workout.inProgress', {
+              step: currentStep,
+              total: totalSets,
+              current: activeIndex + 1,
+              count: prog.exercises.length,
+            })}
           </p>
         </div>
         <div className="row-actions">
@@ -252,10 +273,10 @@ export function Workout() {
             onClick={() => setAutoMode((v) => !v)}
             aria-pressed={autoMode}
           >
-            Enchaînement auto {autoMode ? '✓' : ''}
+            {t('workout.auto')} {autoMode ? '✓' : ''}
           </button>
           <button type="button" className="btn btn-primary" onClick={finish}>
-            Terminer
+            {t('workout.finish')}
           </button>
         </div>
       </header>
@@ -272,6 +293,9 @@ export function Workout() {
         {prog.exercises.map((item, i) => {
           const e = getExerciseById(item.exerciseId);
           const done = logs[i]?.sets.every((s) => s.completed);
+          const shortName = e
+            ? localizeExerciseName(e, locale).slice(0, 18)
+            : '?';
           return (
             <button
               key={item.id}
@@ -280,7 +304,7 @@ export function Workout() {
               onClick={() => goToExercise(i)}
               style={{ opacity: done ? 0.7 : 1 }}
             >
-              {i + 1}. {e?.name.slice(0, 18) ?? '?'}
+              {i + 1}. {shortName}
               {done ? ' ✓' : ''}
             </button>
           );
@@ -294,24 +318,26 @@ export function Workout() {
               type="button"
               className="workout-thumb-btn"
               onClick={() => setSheetId(ex.id)}
-              aria-label={`Voir la technique de ${ex.name}`}
+              aria-label={t('workout.techniqueOf', { name: localizedName })}
             >
-              <ExerciseThumb exerciseId={ex.id} name={ex.name} />
+              <ExerciseThumb exerciseId={ex.id} name={localizedName} />
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h2 style={{ fontSize: '1.35rem', marginBottom: '0.35rem' }}>
-                {ex.name}
+                {localizedName}
               </h2>
               <p className="muted">
-                {pe.sets} × {formatExerciseTarget(pe.exerciseId, pe)}
-                {workSec !== null && ` · effort ${formatSeconds(workSec)}`} ·
-                repos {pe.restSec}s
+                {pe.sets} × {formatExerciseTarget(pe.exerciseId, pe, locale)}
+                {workSec !== null &&
+                  ` · ${t('workout.effortLabel', {
+                    time: formatSeconds(workSec, locale),
+                  })}`}{' '}
+                · {t('workout.restLabel', { seconds: pe.restSec })}
                 {pe.notes ? ` · ${pe.notes}` : ''}
               </p>
               {autoMode && workSec === null && (
                 <p className="muted" style={{ fontSize: '0.85rem' }}>
-                  Aucun temps d’effort défini : valide la série et l’enchaînement
-                  reprend au repos.
+                  {t('workout.noWorkTime')}
                 </p>
               )}
               <div className="row-actions" style={{ marginTop: '0.5rem' }}>
@@ -326,7 +352,9 @@ export function Workout() {
                       })
                     }
                   >
-                    ▶ Chrono {formatSeconds(workSec)}
+                    {t('workout.chrono', {
+                      time: formatSeconds(workSec, locale),
+                    })}
                   </button>
                 )}
                 <button
@@ -334,7 +362,7 @@ export function Workout() {
                   className="btn btn-ghost btn-sm"
                   onClick={() => setSheetId(ex.id)}
                 >
-                  Voir la technique
+                  {t('workout.technique')}
                 </button>
               </div>
             </div>
@@ -356,19 +384,22 @@ export function Workout() {
               <span>#</span>
               <span>
                 {ex.tracking === 'reps'
-                  ? 'Charge'
+                  ? t('workout.charge')
                   : ex.tracking === 'duration'
-                    ? 'Durée'
-                    : 'Distance'}
+                    ? t('workout.duration')
+                    : t('workout.distance')}
               </span>
-              <span>{ex.tracking === 'reps' ? 'Reps' : ''}</span>
-              <span />
+              <span>{ex.tracking === 'reps' ? t('workout.reps') : ''}</span>
+              <span title={t('workout.calories')}>
+                {t('workout.caloriesShort')}
+              </span>
             </div>
             {log.sets.map((set) => (
               <SetRow
                 key={set.setIndex}
                 set={set}
                 tracking={ex.tracking}
+                calories={setCaloriesKcal(set, ex, bodyWeightKg)}
                 active={
                   phase?.kind === 'work' &&
                   phase.exerciseIndex === activeIndex &&
@@ -387,7 +418,7 @@ export function Workout() {
               disabled={activeIndex === 0}
               onClick={() => goToExercise(activeIndex - 1)}
             >
-              Précédent
+              {t('workout.prev')}
             </button>
             <button
               type="button"
@@ -395,7 +426,7 @@ export function Workout() {
               disabled={activeIndex >= prog.exercises.length - 1}
               onClick={() => goToExercise(activeIndex + 1)}
             >
-              Suivant
+              {t('workout.next')}
             </button>
           </div>
         </div>

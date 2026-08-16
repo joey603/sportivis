@@ -1,8 +1,11 @@
+import { useI18n } from '../i18n/I18nContext';
+import { intlLocale } from '../i18n/messages';
 import type { SetLog, TrackingType } from '../types';
 
 type Props = {
   set: SetLog;
   tracking: TrackingType;
+  calories: number;
   active?: boolean;
   onChange: (next: SetLog) => void;
   onComplete: () => void;
@@ -11,10 +14,16 @@ type Props = {
 export function SetRow({
   set,
   tracking,
+  calories,
   active,
   onChange,
   onComplete,
 }: Props) {
+  const { locale, t } = useI18n();
+  const caloriesLabel = calories.toLocaleString(intlLocale(locale), {
+    maximumFractionDigits: 1,
+  });
+
   return (
     <div
       className={`set-row ${set.completed ? 'done' : ''} ${active ? 'active' : ''}`}
@@ -25,7 +34,7 @@ export function SetRow({
           <input
             type="number"
             inputMode="decimal"
-            placeholder="kg"
+            placeholder={t('workout.kg')}
             value={set.weightKg ?? ''}
             disabled={set.completed}
             onChange={(e) =>
@@ -34,12 +43,12 @@ export function SetRow({
                 weightKg: e.target.value === '' ? undefined : Number(e.target.value),
               })
             }
-            aria-label="Charge kg"
+            aria-label={t('workout.ariaKg')}
           />
           <input
             type="number"
             inputMode="numeric"
-            placeholder="reps"
+            placeholder={t('workout.reps')}
             value={set.reps ?? ''}
             disabled={set.completed}
             onChange={(e) =>
@@ -48,7 +57,7 @@ export function SetRow({
                 reps: e.target.value === '' ? undefined : Number(e.target.value),
               })
             }
-            aria-label="Répétitions"
+            aria-label={t('workout.ariaReps')}
           />
         </>
       )}
@@ -56,7 +65,7 @@ export function SetRow({
         <input
           type="number"
           inputMode="numeric"
-          placeholder="sec"
+          placeholder={t('workout.sec')}
           value={set.durationSec ?? ''}
           disabled={set.completed}
           style={{ gridColumn: 'span 2' }}
@@ -66,14 +75,14 @@ export function SetRow({
               durationSec: e.target.value === '' ? undefined : Number(e.target.value),
             })
           }
-          aria-label="Durée secondes"
+          aria-label={t('workout.ariaDuration')}
         />
       )}
       {tracking === 'distance' && (
         <input
           type="number"
           inputMode="numeric"
-          placeholder="mètres"
+          placeholder={t('workout.meters')}
           value={set.distanceM ?? ''}
           disabled={set.completed}
           style={{ gridColumn: 'span 2' }}
@@ -83,15 +92,23 @@ export function SetRow({
               distanceM: e.target.value === '' ? undefined : Number(e.target.value),
             })
           }
-          aria-label="Distance mètres"
+          aria-label={t('workout.ariaDistance')}
         />
       )}
       <div className="check-wrap">
+        <span
+          className="set-calories"
+          aria-label={t('workout.caloriesAria', { count: caloriesLabel })}
+        >
+          {t('workout.caloriesValue', { count: caloriesLabel })}
+        </span>
         <button
           type="button"
           className={`check-btn ${set.completed ? 'on' : ''}`}
           onClick={onComplete}
-          aria-label={set.completed ? 'Série validée' : 'Valider la série'}
+          aria-label={
+            set.completed ? t('workout.setDone') : t('workout.setValidate')
+          }
         >
           {set.completed ? '✓' : ''}
         </button>

@@ -7,6 +7,8 @@ create table if not exists public.program_shares (
   recipient_id uuid not null references auth.users (id) on delete cascade,
   source_program_id uuid not null,
   sender_name text not null,
+  recipient_name text not null,
+  recipient_email text not null,
   program_name text not null,
   program_description text,
   exercises jsonb not null default '[]'::jsonb,
@@ -17,6 +19,29 @@ create table if not exists public.program_shares (
   responded_at timestamptz,
   check (sender_id <> recipient_id)
 );
+
+-- Rend le script rejouable sur les installations qui possèdent déjà la table.
+alter table public.program_shares
+  add column if not exists recipient_name text;
+alter table public.program_shares
+  add column if not exists recipient_email text;
+
+update public.program_shares as share
+   set recipient_name = coalesce(
+         nullif(trim(concat_ws(' ', profile.first_name, profile.last_name)), ''),
+         split_part("user".email, '@', 1),
+         'Utilisateur Sportivis'
+       ),
+       recipient_email = lower("user".email)
+  from auth.users as "user"
+  left join public.profiles as profile on profile.user_id = "user".id
+ where share.recipient_id = "user".id
+   and (share.recipient_name is null or share.recipient_email is null);
+
+alter table public.program_shares
+  alter column recipient_name set not null;
+alter table public.program_shares
+  alter column recipient_email set not null;
 
 create index if not exists program_shares_recipient_pending_idx
   on public.program_shares (recipient_id, created_at desc)
@@ -51,6 +76,8 @@ as $$
 declare
   v_sender_id uuid := auth.uid();
   v_recipient_id uuid;
+  v_recipient_name text;
+  v_recipient_email text;
   v_program public.programs%rowtype;
   v_sender_name text;
   v_custom_exercises jsonb;
@@ -65,10 +92,18 @@ begin
     raise exception 'Renseigne l’email du destinataire.';
   end if;
 
-  select id
-    into v_recipient_id
-    from auth.users
-   where lower(email) = lower(trim(p_recipient_email))
+  select
+    recipient.id,
+    lower(recipient.email),
+    coalesce(
+      nullif(trim(concat_ws(' ', profile.first_name, profile.last_name)), ''),
+      split_part(recipient.email, '@', 1),
+      'Utilisateur Sportivis'
+    )
+    into v_recipient_id, v_recipient_email, v_recipient_name
+    from auth.users as recipient
+    left join public.profiles as profile on profile.user_id = recipient.id
+   where lower(recipient.email) = lower(trim(p_recipient_email))
    limit 1;
 
   if v_recipient_id is null then
@@ -144,6 +179,8 @@ begin
     recipient_id,
     source_program_id,
     sender_name,
+    recipient_name,
+    recipient_email,
     program_name,
     program_description,
     exercises,
@@ -154,6 +191,8 @@ begin
     v_recipient_id,
     v_program.id,
     v_sender_name,
+    v_recipient_name,
+    v_recipient_email,
     v_program.name,
     v_program.description,
     v_program.exercises,
@@ -163,6 +202,35 @@ begin
 
   return v_share_id;
 end;
+$$;
+
+create or replace function public.list_sent_program_shares(
+  p_program_id uuid
+)
+returns table (
+  id uuid,
+  recipient_name text,
+  recipient_email text,
+  status text,
+  created_at timestamptz,
+  responded_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public, auth, pg_temp
+as $$
+  select
+    share.id,
+    share.recipient_name,
+    share.recipient_email,
+    share.status,
+    share.created_at,
+    share.responded_at
+  from public.program_shares as share
+  where share.sender_id = auth.uid()
+    and share.source_program_id = p_program_id
+  order by share.created_at desc;
 $$;
 
 create or replace function public.respond_to_program_share(
@@ -291,6 +359,8 @@ end;
 $$;
 
 revoke all on function public.share_program_with_email(uuid, text) from public;
+revoke all on function public.list_sent_program_shares(uuid) from public;
 revoke all on function public.respond_to_program_share(uuid, boolean) from public;
 grant execute on function public.share_program_with_email(uuid, text) to authenticated;
+grant execute on function public.list_sent_program_shares(uuid) to authenticated;
 grant execute on function public.respond_to_program_share(uuid, boolean) to authenticated;

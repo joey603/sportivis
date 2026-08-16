@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { CustomExerciseForm } from './CustomExerciseForm';
 import { ExerciseFilters, useExerciseFilters } from './ExerciseFilters';
 import { ExerciseThumb } from './ExerciseThumb';
+import {
+  localizeEquipment,
+  localizeExerciseName,
+  localizeMuscle,
+} from '../i18n/exercises';
+import { useI18n } from '../i18n/I18nContext';
 import type { Exercise } from '../types';
 
 type Props = {
@@ -10,6 +16,7 @@ type Props = {
 };
 
 export function ExercisePicker({ onPick, onClose }: Props) {
+  const { locale, t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
   const [libraryVersion, setLibraryVersion] = useState(0);
   const filters = useExerciseFilters(libraryVersion);
@@ -21,45 +28,56 @@ export function ExercisePicker({ onPick, onClose }: Props) {
         className="modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Choisir un exercice"
+        aria-label={t('exercises.choose')}
       >
         <div className="sheet-head">
           <div>
-            <h2>Ajouter un exercice</h2>
-            <p className="muted">Choisis dans la bibliothèque ou crée le tien.</p>
+            <h2>{t('exercises.add')}</h2>
+            <p className="muted">{t('exercises.chooseHint')}</p>
           </div>
           <button
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => setCreateOpen(true)}
           >
-            + Créer
+            {t('exercises.create')}
           </button>
         </div>
 
-        <ExerciseFilters {...filters} autoFocus placeholder="Rechercher…" />
+        <ExerciseFilters {...filters} autoFocus />
 
         <div className="exercise-list" style={{ maxHeight: '50vh', overflow: 'auto' }}>
-          {results.length === 0 && <p className="empty">Aucun exercice</p>}
+          {results.length === 0 && (
+            <p className="empty">{t('exercises.empty')}</p>
+          )}
           {results.map((ex) => (
             <button
               key={ex.id}
               type="button"
               className="exercise-row"
-              style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+              style={{ width: '100%', textAlign: 'start', cursor: 'pointer' }}
               onClick={() => onPick(ex)}
             >
-              <ExerciseThumb exerciseId={ex.id} name={ex.name} />
-              <div className="name">{ex.name}</div>
-              <span className="badge">{ex.muscle}</span>
-              {ex.custom && <span className="badge">personnel</span>}
-              <span className="badge badge-accent">{ex.equipment.replace(/_/g, ' ')}</span>
+              <ExerciseThumb
+                exerciseId={ex.id}
+                name={localizeExerciseName(ex, locale)}
+              />
+              <div className="name">{localizeExerciseName(ex, locale)}</div>
+              <span className="badge">
+                {localizeMuscle(ex.muscle, locale)}
+              </span>
+              {ex.custom && (
+                <span className="badge">{t('exercises.customBadge')}</span>
+              )}
+              <span className="badge badge-accent">
+                {localizeEquipment(ex.equipment, locale)}
+              </span>
             </button>
           ))}
         </div>
         <div style={{ marginTop: '1rem' }}>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Fermer
+            {t('common.close')}
           </button>
         </div>
       </div>

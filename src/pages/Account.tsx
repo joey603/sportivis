@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
 import { loadSettings, saveBodyWeightKg } from '../lib/calories';
 import { addWeightEntry, saveProfile } from '../lib/storage';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -7,6 +8,7 @@ import { useAppData } from '../lib/useAppData';
 
 export function Account() {
   const auth = useAuth();
+  const { t } = useI18n();
   const [data, setData] = useAppData();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -33,11 +35,11 @@ export function Account() {
   function saveAccountProfile() {
     const ageNumber = Number(age);
     if (!firstName.trim() || !lastName.trim()) {
-      setMessage('Le prénom et le nom sont obligatoires.');
+      setMessage(t('account.nameRequired'));
       return;
     }
     if (!Number.isInteger(ageNumber) || ageNumber < 13 || ageNumber > 120) {
-      setMessage('Indique un âge entre 13 et 120 ans.');
+      setMessage(t('account.ageInvalid'));
       return;
     }
     setData(
@@ -47,19 +49,19 @@ export function Account() {
         age: ageNumber,
       }),
     );
-    setMessage('Profil enregistré.');
+    setMessage(t('account.profileSaved'));
   }
 
   function saveWeight() {
     const value = Number(bodyWeightKg.replace(',', '.'));
     if (!Number.isFinite(value) || value < 30 || value > 300) {
-      setMessage('Indique un poids entre 30 et 300 kg.');
+      setMessage(t('account.weightInvalid'));
       return;
     }
     const saved = saveBodyWeightKg(value);
     setData(addWeightEntry(saved.bodyWeightKg));
     setBodyWeightKg(String(saved.bodyWeightKg));
-    setMessage('Poids enregistré dans ton suivi — les calories sont recalculées.');
+    setMessage(t('account.weightSaved'));
   }
 
   if (!isSupabaseConfigured) {
@@ -67,8 +69,8 @@ export function Account() {
       <div>
         <header className="page-header">
           <div>
-            <h1>Compte</h1>
-            <p>Mode local — aucun compte requis.</p>
+            <h1>{t('account.title')}</h1>
+            <p>{t('account.localMode')}</p>
           </div>
         </header>
         <WeightPanel
@@ -105,7 +107,7 @@ export function Account() {
       await action();
       setMessage(done);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Erreur');
+      setMessage(err instanceof Error ? err.message : t('account.error'));
     } finally {
       setBusy(false);
     }
@@ -115,8 +117,8 @@ export function Account() {
     <div>
       <header className="page-header">
         <div>
-          <h1>Compte</h1>
-          <p>Connecté — tes données sont synchronisées.</p>
+          <h1>{t('account.title')}</h1>
+          <p>{t('account.connected')}</p>
         </div>
       </header>
 
@@ -139,13 +141,13 @@ export function Account() {
 
       <div className="panel" style={{ marginTop: '0.75rem' }}>
         <p>
-          <strong>Email</strong>
+          <strong>{t('login.email')}</strong>
           <br />
           {auth.user?.email}
         </p>
         {auth.syncing && (
           <p className="muted" style={{ marginTop: '0.75rem' }}>
-            Synchronisation en cours…
+            {t('account.syncing')}
           </p>
         )}
         {auth.error && (
@@ -165,34 +167,28 @@ export function Account() {
             className="btn btn-secondary"
             disabled={busy || auth.syncing}
             onClick={() =>
-              void run(
-                auth.pullCloudToLocal,
-                'Données cloud téléchargées sur cet appareil.',
-              )
+              void run(auth.pullCloudToLocal, t('account.pullDone'))
             }
           >
-            Télécharger le cloud
+            {t('account.pullCloud')}
           </button>
           <button
             type="button"
             className="btn btn-secondary"
             disabled={busy || auth.syncing}
             onClick={() =>
-              void run(
-                auth.pushLocalToCloud,
-                'Données locales envoyées vers le cloud.',
-              )
+              void run(auth.pushLocalToCloud, t('account.pushDone'))
             }
           >
-            Envoyer le local
+            {t('account.pushLocal')}
           </button>
           <button
             type="button"
             className="btn btn-ghost"
             disabled={busy}
-            onClick={() => void run(auth.signOut, 'Déconnecté.')}
+            onClick={() => void run(auth.signOut, t('account.signedOut'))}
           >
-            Se déconnecter
+            {t('nav.logout')}
           </button>
         </div>
       </div>
@@ -217,14 +213,15 @@ function ProfilePanel({
   setAge: (value: string) => void;
   onSave: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="panel" style={{ marginTop: '0.75rem' }}>
       <h2 style={{ fontSize: '1.05rem', marginBottom: '0.85rem' }}>
-        Informations personnelles
+        {t('account.profile')}
       </h2>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="account-first-name">Prénom</label>
+          <label htmlFor="account-first-name">{t('account.firstName')}</label>
           <input
             id="account-first-name"
             value={firstName}
@@ -232,7 +229,7 @@ function ProfilePanel({
           />
         </div>
         <div className="field">
-          <label htmlFor="account-last-name">Nom</label>
+          <label htmlFor="account-last-name">{t('account.lastName')}</label>
           <input
             id="account-last-name"
             value={lastName}
@@ -240,7 +237,7 @@ function ProfilePanel({
           />
         </div>
         <div className="field">
-          <label htmlFor="account-age">Âge</label>
+          <label htmlFor="account-age">{t('account.age')}</label>
           <input
             id="account-age"
             type="number"
@@ -252,7 +249,7 @@ function ProfilePanel({
         </div>
       </div>
       <button type="button" className="btn btn-primary btn-sm" onClick={onSave}>
-        Enregistrer le profil
+        {t('account.saveProfile')}
       </button>
     </div>
   );
@@ -269,17 +266,17 @@ function WeightPanel({
   onSave: () => void;
   message: string | null;
 }) {
+  const { t } = useI18n();
   return (
     <div className="panel">
       <h2 style={{ fontSize: '1.05rem', marginBottom: '0.4rem' }}>
-        Estimation des calories
+        {t('account.caloriesTitle')}
       </h2>
       <p className="muted" style={{ marginBottom: '0.85rem', fontSize: '0.9rem' }}>
-        Le calcul utilise ton poids, le type d’exercice (MET) et les séries
-        terminées. C’est une estimation, pas une mesure médicale.
+        {t('account.caloriesHint')}
       </p>
       <div className="field" style={{ maxWidth: 220 }}>
-        <label htmlFor="body-weight">Poids corporel (kg)</label>
+        <label htmlFor="body-weight">{t('account.weight')}</label>
         <input
           id="body-weight"
           type="number"
@@ -292,7 +289,7 @@ function WeightPanel({
       </div>
       <div className="row-actions">
         <button type="button" className="btn btn-primary btn-sm" onClick={onSave}>
-          Enregistrer le poids
+          {t('account.saveWeight')}
         </button>
       </div>
       {message && (

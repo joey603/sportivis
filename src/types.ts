@@ -71,6 +71,17 @@ export type ProgramShare = {
   createdAt: string;
 };
 
+export type ProgramShareStatus = 'pending' | 'accepted' | 'rejected';
+
+export type SentProgramShare = {
+  id: string;
+  recipientName: string;
+  recipientEmail: string;
+  status: ProgramShareStatus;
+  createdAt: string;
+  respondedAt?: string;
+};
+
 export type SetLog = {
   setIndex: number;
   completed: boolean;

@@ -2,6 +2,8 @@
  * Consignes d'exécution en français, 2 à 4 points clés par exercice.
  * Complète les photos de démonstration (voir exerciseMedia.ts).
  */
+import type { Locale } from '../i18n/messages';
+import { EXERCISE_GUIDES_HE } from './exerciseGuidesHe';
 
 export const EXERCISE_GUIDES: Record<string, string[]> = {
   // —— Pectoraux ——
@@ -588,6 +590,7 @@ export const EXERCISE_GUIDES: Record<string, string[]> = {
   ],
 };
 
-export function getGuide(exerciseId: string): string[] {
-  return EXERCISE_GUIDES[exerciseId] ?? [];
+export function getGuide(exerciseId: string, locale: Locale = 'fr'): string[] {
+  const guides = locale === 'he' ? EXERCISE_GUIDES_HE : EXERCISE_GUIDES;
+  return guides[exerciseId] ?? [];
 }

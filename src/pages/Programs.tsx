@@ -5,9 +5,11 @@ import {
   ShareProgramDialog,
 } from '../components/ProgramSharing';
 import { useAuth } from '../auth/AuthContext';
+import { useI18n } from '../i18n/I18nContext';
 import {
   fetchCloudData,
   fetchIncomingProgramSharesCloud,
+  fetchSentProgramSharesCloud,
   respondToProgramShareCloud,
   shareProgramCloud,
 } from '../lib/cloud';
@@ -18,16 +20,19 @@ import {
   saveData,
 } from '../lib/storage';
 import { useAppData } from '../lib/useAppData';
-import type { Program, ProgramShare } from '../types';
+import type { Program, ProgramShare, SentProgramShare } from '../types';
 
 export function Programs() {
   const navigate = useNavigate();
   const auth = useAuth();
+  const { t } = useI18n();
   const [data, setData] = useAppData();
   const [shareProgram, setShareProgram] = useState<Program | null>(null);
   const [preview, setPreview] = useState<ProgramShare | null>(null);
   const [busyShareId, setBusyShareId] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [sentShares, setSentShares] = useState<SentProgramShare[]>([]);
+  const [loadingSentShares, setLoadingSentShares] = useState(false);
   const userId = auth.user?.id;
 
   useEffect(() => {
@@ -77,13 +82,33 @@ export function Programs() {
   }
 
   function onDelete(id: string, name: string) {
-    if (!confirm(`Supprimer « ${name} » ?`)) return;
+    if (!confirm(t('programs.deleteConfirm', { name }))) return;
     setData(deleteProgram(id));
+  }
+
+  function exerciseCountLabel(count: number) {
+    return t(count > 1 ? 'programs.exerciseCount_plural' : 'programs.exerciseCount', {
+      count,
+    });
   }
 
   async function sendShare(email: string) {
     if (!shareProgram) return;
     await shareProgramCloud(shareProgram.id, email);
+    setSentShares(await fetchSentProgramSharesCloud(shareProgram.id));
+  }
+
+  async function openShare(program: Program) {
+    setShareProgram(program);
+    setSentShares([]);
+    setLoadingSentShares(true);
+    try {
+      setSentShares(await fetchSentProgramSharesCloud(program.id));
+    } catch (reason) {
+      console.warn('[partages envoyés]', reason);
+    } finally {
+      setLoadingSentShares(false);
+    }
   }
 
   async function respondToShare(share: ProgramShare, accept: boolean) {
@@ -99,7 +124,7 @@ export function Programs() {
       setShareError(
         reason instanceof Error
           ? reason.message
-          : 'La réponse au partage a échoué.',
+          : t('programs.shareRespondError'),
       );
     } finally {
       setBusyShareId(null);
@@ -110,11 +135,11 @@ export function Programs() {
     <div>
       <header className="page-header">
         <div>
-          <h1>Programmes</h1>
-          <p>Séries, reps, repos — puis lance la séance.</p>
+          <h1>{t('programs.title')}</h1>
+          <p>{t('programs.subtitle')}</p>
         </div>
         <button type="button" className="btn btn-primary" onClick={createNew}>
-          Créer
+          {t('common.create')}
         </button>
       </header>
 
@@ -123,11 +148,13 @@ export function Programs() {
           <div className="incoming-programs-heading">
             <div>
               <span className="badge badge-accent">
-                {data.incomingProgramShares.length} en attente
+                {t('programs.pendingCount', {
+                  count: data.incomingProgramShares.length,
+                })}
               </span>
-              <h2 id="incoming-programs-title">Programmes reçus</h2>
+              <h2 id="incoming-programs-title">{t('programs.incoming')}</h2>
             </div>
-            <p className="muted">Consulte-les avant de les ajouter à tes programmes.</p>
+            <p className="muted">{t('programs.incomingHint')}</p>
           </div>
 
           {shareError && <p className="exchange-error">{shareError}</p>}
@@ -135,12 +162,11 @@ export function Programs() {
           {data.incomingProgramShares.map((share) => (
             <div key={share.id} className="panel program-card shared-program-card">
               <span className="shared-program-sender">
-                Partagé par {share.senderName}
+                {t('programs.sharedBy', { name: share.senderName })}
               </span>
               <h3>{share.program.name}</h3>
               <p className="meta">
-                {share.program.exercises.length} exercice
-                {share.program.exercises.length > 1 ? 's' : ''}
+                {exerciseCountLabel(share.program.exercises.length)}
                 {share.program.description ? ` · ${share.program.description}` : ''}
               </p>
               <div className="row-actions" style={{ marginTop: '0.85rem' }}>
@@ -150,7 +176,7 @@ export function Programs() {
                   disabled={busyShareId === share.id}
                   onClick={() => void respondToShare(share, true)}
                 >
-                  Accepter
+                  {t('common.accept')}
                 </button>
                 <button
                   type="button"
@@ -158,7 +184,7 @@ export function Programs() {
                   disabled={busyShareId === share.id}
                   onClick={() => void respondToShare(share, false)}
                 >
-                  Refuser
+                  {t('common.reject')}
                 </button>
                 <button
                   type="button"
@@ -169,7 +195,7 @@ export function Programs() {
                     setPreview(share);
                   }}
                 >
-                  Voir
+                  {t('common.view')}
                 </button>
               </div>
             </div>
@@ -178,37 +204,37 @@ export function Programs() {
       )}
 
       {data.programs.length === 0 && (
-        <p className="empty">Aucun programme. Crée-en un pour commencer.</p>
+        <p className="empty">{t('programs.empty')}</p>
       )}
 
       {data.programs.map((p) => (
         <div key={p.id} className="panel program-card">
           <h3>{p.name}</h3>
           <p className="meta">
-            {p.exercises.length} exercice{p.exercises.length > 1 ? 's' : ''}
+            {exerciseCountLabel(p.exercises.length)}
             {p.description ? ` · ${p.description}` : ''}
           </p>
           <div className="row-actions" style={{ marginTop: '0.85rem' }}>
             <Link to={`/seance/${p.id}`} className="btn btn-primary btn-sm">
-              Lancer
+              {t('common.launch')}
             </Link>
             <Link to={`/programmes/${p.id}`} className="btn btn-secondary btn-sm">
-              Éditer
+              {t('common.edit')}
             </Link>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
               onClick={() => onDuplicate(p.id)}
             >
-              Dupliquer
+              {t('common.duplicate')}
             </button>
             {auth.configured && auth.user && (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => setShareProgram(p)}
+                onClick={() => void openShare(p)}
               >
-                Partager
+                {t('common.share')}
               </button>
             )}
             <button
@@ -216,7 +242,7 @@ export function Programs() {
               className="btn btn-danger btn-sm"
               onClick={() => onDelete(p.id, p.name)}
             >
-              Supprimer
+              {t('common.delete')}
             </button>
           </div>
         </div>
@@ -225,6 +251,8 @@ export function Programs() {
       {shareProgram && (
         <ShareProgramDialog
           program={shareProgram}
+          sentShares={sentShares}
+          loadingHistory={loadingSentShares}
           onShare={sendShare}
           onClose={() => setShareProgram(null)}
         />

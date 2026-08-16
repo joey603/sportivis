@@ -7,6 +7,7 @@ import type {
   UserProfile,
   WeightEntry,
 } from '../types';
+import type { Locale } from '../i18n/messages';
 import { EXERCISES, getExerciseById as getBuiltInExercise } from '../data/exercises';
 import {
   deleteProgramCloud,
@@ -375,12 +376,15 @@ export function sessionDurationMin(session: Session): number | null {
   return Math.max(1, Math.round(ms / 60000));
 }
 
-export function formatSeconds(totalSec: number): string {
+export function formatSeconds(totalSec: number, locale: Locale = 'fr'): string {
   if (totalSec >= 60) {
     const rest = totalSec % 60;
+    if (locale === 'he') {
+      return `${Math.floor(totalSec / 60)} דק׳${rest ? ` ${rest} שנ׳` : ''}`.trim();
+    }
     return `${Math.floor(totalSec / 60)} min ${rest ? `${rest}s` : ''}`.trim();
   }
-  return `${totalSec}s`;
+  return locale === 'he' ? `${totalSec} שנ׳` : `${totalSec}s`;
 }
 
 export function formatExerciseTarget(
@@ -390,12 +394,21 @@ export function formatExerciseTarget(
     durationSec?: number;
     distanceM?: number;
   },
+  locale: Locale = 'fr',
 ): string {
   const ex = getExerciseById(exerciseId);
   if (!ex) return '—';
-  if (ex.tracking === 'reps') return `${pe.reps ?? '—'} reps`;
-  if (ex.tracking === 'duration') return formatSeconds(pe.durationSec ?? 0);
-  return `${pe.distanceM ?? '—'} m`;
+  if (ex.tracking === 'reps') {
+    return locale === 'he'
+      ? `${pe.reps ?? '—'} חזרות`
+      : `${pe.reps ?? '—'} reps`;
+  }
+  if (ex.tracking === 'duration') {
+    return formatSeconds(pe.durationSec ?? 0, locale);
+  }
+  return locale === 'he'
+    ? `${pe.distanceM ?? '—'} מ׳`
+    : `${pe.distanceM ?? '—'} m`;
 }
 
 /**
