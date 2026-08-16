@@ -724,15 +724,6 @@ export function Nutrition() {
           )}
 
           <div className="row-actions" style={{ marginTop: '0.85rem' }}>
-            {previewTab === 'estimate' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setPreviewTab('refine')}
-              >
-                {t('nutrition.tabRefine')}
-              </button>
-            )}
             <button type="button" className="btn btn-primary" onClick={save}>
               {t('nutrition.add')}
             </button>
