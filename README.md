@@ -70,7 +70,7 @@ GROQ_API_KEY=...
    Puis **redéploie**. Les variables `VITE_` seules suffisent au front, pas forcément aux fonctions serverless si elles ne sont pas exposées au runtime.
 4. Exécute [`supabase/ai_features.sql`](supabase/ai_features.sql) : il crée le journal alimentaire et le compteur de quota.
 
-Par défaut, les programmes utilisent `llama-3.3-70b-versatile` (production) et les repas `openai/gpt-oss-20b`. Tu peux surcharger via `GROQ_MODEL_PROGRAM` / `GROQ_MODEL_MEAL` ; les previews Qwen / anciens IDs sont réécrits vers des modèles production stables.
+Par défaut, les programmes utilisent `llama-3.3-70b-versatile` et les repas `llama-3.1-8b-instant` (toujours via **Groq**). Tu peux surcharger via `GROQ_MODEL_PROGRAM` / `GROQ_MODEL_MEAL` ; les previews Qwen / gpt-oss sont réécrits vers Llama.
 
 Le quota journalier par utilisateur est appliqué dans Postgres (`consume_ai_quota`), donc il n’est pas contournable depuis le client : 10 générations de programme et 40 analyses de repas par jour. Les valeurs se changent dans la fonction `ai_quota_limit`.
 

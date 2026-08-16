@@ -64,7 +64,7 @@ export type GeneratedProgram = {
 export async function generateProgramAi(
   request: ProgramRequest,
 ): Promise<GeneratedProgram> {
-  const { program, remaining } = await post<{
+  const { program, remaining } = await postWithRetry<{
     program: unknown;
     remaining: number;
   }>('/api/generate-program', {
@@ -122,7 +122,7 @@ export async function analyzeMealAi(
   clarifications?: MealClarificationAnswer[],
   options?: { assumeTypical?: boolean },
 ): Promise<AnalyzeMealResult> {
-  return post<AnalyzeMealResult>('/api/analyze-meal', {
+  return postWithRetry<AnalyzeMealResult>('/api/analyze-meal', {
     description,
     locale,
     clarifications: clarifications?.length ? clarifications : undefined,
@@ -155,6 +155,25 @@ export async function fetchAiQuota(feature: AiFeature): Promise<number | null> {
     return null;
   }
   return typeof data === 'number' ? data : null;
+}
+
+async function postWithRetry<T>(url: string, body: unknown): Promise<T> {
+  try {
+    return await post<T>(url, body);
+  } catch (reason) {
+    const code = aiErrorCode(reason);
+    if (
+      code !== 'ai_unreachable' &&
+      code !== 'ai_overloaded' &&
+      code !== 'ai_empty' &&
+      code !== 'ai_invalid_json' &&
+      code !== 'invalid_groq_key'
+    ) {
+      throw reason;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    return post<T>(url, body);
+  }
 }
 
 async function post<T>(url: string, body: unknown): Promise<T> {

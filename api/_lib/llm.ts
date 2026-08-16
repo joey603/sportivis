@@ -2,32 +2,32 @@ import { HttpError } from './http.js';
 import { requireGroqApiKey } from './quota.js';
 
 /**
- * Client LLM via Groq (API compatible OpenAI).
+ * Client LLM via Groq (https://api.groq.com) — on n’a jamais quitté Groq.
  *
- * On privilégie les modèles **Production** Groq : les previews
- * (ex. qwen/qwen3.6-27b) renvoient parfois des 401 « Invalid API Key »
- * intermittents alors que la clé est valide.
+ * Seuls les *modèles* changent : certains IDs Groq (Qwen preview, gpt-oss…)
+ * renvoient des 401 « Invalid API Key » intermittents alors que la clé
+ * fonctionne sur /models et sur d’autres modèles. On reste sur Llama production.
  */
 const DEFAULT_MODEL_PROGRAM = 'llama-3.3-70b-versatile';
-const DEFAULT_MODEL_MEAL = 'openai/gpt-oss-20b';
-/** Chaîne de secours (production uniquement). */
+const DEFAULT_MODEL_MEAL = 'llama-3.1-8b-instant';
+/** Secours : toujours des modèles Groq production. */
 const FALLBACK_MODELS = [
-  'openai/gpt-oss-20b',
-  'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'openai/gpt-oss-20b',
 ] as const;
 const TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 2;
-const RETRY_DELAYS_MS = [600];
+const RETRY_DELAYS_MS = [500, 1200];
 
-/** Anciens IDs / previews → modèles production stables. */
+/** Anciens IDs / previews → modèles Groq production stables. */
 const MODEL_ALIASES: Record<string, string> = {
-  'llama-3.1-8b-instant': 'llama-3.1-8b-instant',
+  'llama-3.1-8b-instant': DEFAULT_MODEL_MEAL,
   'llama-3.3-70b-versatile': DEFAULT_MODEL_PROGRAM,
   'llama-3.1-70b-versatile': DEFAULT_MODEL_PROGRAM,
   'llama3-70b-8192': DEFAULT_MODEL_PROGRAM,
-  'llama3-8b-8192': 'llama-3.1-8b-instant',
-  'openai/gpt-oss-120b': DEFAULT_MODEL_MEAL,
+  'llama3-8b-8192': DEFAULT_MODEL_MEAL,
+  'openai/gpt-oss-120b': DEFAULT_MODEL_PROGRAM,
   'openai/gpt-oss-20b': DEFAULT_MODEL_MEAL,
   'qwen/qwen3.6-27b': DEFAULT_MODEL_PROGRAM,
   'qwen/qwen3-32b': DEFAULT_MODEL_PROGRAM,
@@ -78,23 +78,33 @@ export async function generateJson<T>(options: {
   const system = `${options.systemInstruction}\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans texte autour, respectant exactement cette forme :\n${describeSchema(options.schema)}`;
 
   let lastError: HttpError | null = null;
-  for (const model of models) {
-    const body = buildRequestBody(
-      model,
-      system,
-      options.prompt,
-      options.temperature,
-    );
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      if (attempt > 0) await delay(RETRY_DELAYS_MS[attempt - 1] ?? 800);
 
-      const result = await requestOnce<T>(model, apiKey, body);
-      if (result.ok) return result.value;
-      lastError = result.error;
-      // 401/403/modèle mort : passer au suivant tout de suite.
-      if (result.tryNextModel) break;
-      if (result.retryable) continue;
-      throw result.error;
+  // Deux tours de la chaîne de modèles : les 401 Groq sont souvent transitoires.
+  for (let round = 0; round < 2; round++) {
+    if (round > 0) await delay(RETRY_DELAYS_MS[1] ?? 1200);
+
+    for (const model of models) {
+      const body = buildRequestBody(
+        model,
+        system,
+        options.prompt,
+        options.temperature,
+      );
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        if (attempt > 0) await delay(RETRY_DELAYS_MS[0] ?? 500);
+
+        const result = await requestOnce<T>(model, apiKey, body);
+        if (result.ok) {
+          if (round > 0 || model !== models[0]) {
+            console.info(`[groq] ok via ${model} (round ${round + 1})`);
+          }
+          return result.value;
+        }
+        lastError = result.error;
+        if (result.tryNextModel) break;
+        if (result.retryable) continue;
+        throw result.error;
+      }
     }
   }
 
@@ -129,7 +139,6 @@ function buildRequestBody(
     ],
     response_format: { type: 'json_object' },
   };
-  // Qwen3 raisonne par défaut : on le coupe pour les réponses JSON courtes.
   if (model.includes('qwen3')) {
     payload.reasoning_effort = 'none';
   }
@@ -171,7 +180,6 @@ type RequestResult<T> =
   | {
       ok: false;
       retryable: boolean;
-      /** Passer au modèle de secours (401/403/modèle mort). */
       tryNextModel?: boolean;
       error: HttpError;
     };
@@ -223,12 +231,11 @@ async function requestOnce<T>(
       };
     }
     if (response.status === 401 || response.status === 403) {
-      // Souvent un modèle preview / accès intermittent — pas une vraie clé cassée.
+      // Même clé OK sur /models : 401 chat souvent transitoire / modèle.
       console.error(`[groq] ${response.status}`, model, groqMessage || '(empty)');
       return {
         ok: false,
-        retryable: false,
-        tryNextModel: true,
+        retryable: true,
         error: new HttpError(503, 'ai_unreachable'),
       };
     }
@@ -253,7 +260,12 @@ async function requestOnce<T>(
       };
     }
     console.error('[groq]', response.status, groqMessage);
-    return { ok: false, retryable: true, tryNextModel: true, error: new HttpError(502, 'ai_unreachable') };
+    return {
+      ok: false,
+      retryable: true,
+      tryNextModel: true,
+      error: new HttpError(502, 'ai_unreachable'),
+    };
   }
 
   const text = extractJsonText(payload?.choices?.[0]?.message);
