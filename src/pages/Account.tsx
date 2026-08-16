@@ -5,6 +5,7 @@ import { loadSettings, saveBodyWeightKg } from '../lib/calories';
 import { addWeightEntry, saveProfile } from '../lib/storage';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { useAppData } from '../lib/useAppData';
+import type { BiologicalSex } from '../types';
 
 export function Account() {
   const auth = useAuth();
@@ -15,6 +16,10 @@ export function Account() {
   const [firstName, setFirstName] = useState(data.profile?.firstName ?? '');
   const [lastName, setLastName] = useState(data.profile?.lastName ?? '');
   const [age, setAge] = useState(data.profile ? String(data.profile.age) : '');
+  const [sex, setSex] = useState<BiologicalSex | ''>(data.profile?.sex ?? '');
+  const [heightCm, setHeightCm] = useState(
+    data.profile?.heightCm ? String(data.profile.heightCm) : '',
+  );
   const [bodyWeightKg, setBodyWeightKg] = useState(
     () =>
       String(data.weightEntries.at(-1)?.weightKg ?? loadSettings().bodyWeightKg),
@@ -25,6 +30,8 @@ export function Account() {
     setFirstName(data.profile.firstName);
     setLastName(data.profile.lastName);
     setAge(String(data.profile.age));
+    setSex(data.profile.sex ?? '');
+    setHeightCm(data.profile.heightCm ? String(data.profile.heightCm) : '');
   }, [data.profile]);
 
   useEffect(() => {
@@ -34,6 +41,7 @@ export function Account() {
 
   function saveAccountProfile() {
     const ageNumber = Number(age);
+    const heightNumber = heightCm ? Number(heightCm) : undefined;
     if (!firstName.trim() || !lastName.trim()) {
       setMessage(t('account.nameRequired'));
       return;
@@ -42,11 +50,27 @@ export function Account() {
       setMessage(t('account.ageInvalid'));
       return;
     }
+    if (!sex || heightNumber == null) {
+      setMessage(t('account.profileRequired'));
+      return;
+    }
+    if (
+      (!Number.isFinite(heightNumber) ||
+        heightNumber < 120 ||
+        heightNumber > 250)
+    ) {
+      setMessage(t('account.heightInvalid'));
+      return;
+    }
     setData(
       saveProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         age: ageNumber,
+        sex,
+        heightCm: heightNumber,
+        goal: data.profile?.goal,
+        sessionsPerWeek: data.profile?.sessionsPerWeek,
       }),
     );
     setMessage(t('account.profileSaved'));
@@ -83,9 +107,13 @@ export function Account() {
           firstName={firstName}
           lastName={lastName}
           age={age}
+          sex={sex}
+          heightCm={heightCm}
           setFirstName={setFirstName}
           setLastName={setLastName}
           setAge={setAge}
+          setSex={setSex}
+          setHeightCm={setHeightCm}
           onSave={saveAccountProfile}
         />
         <div className="panel" style={{ marginTop: '0.75rem' }}>
@@ -133,9 +161,13 @@ export function Account() {
         firstName={firstName}
         lastName={lastName}
         age={age}
+        sex={sex}
+        heightCm={heightCm}
         setFirstName={setFirstName}
         setLastName={setLastName}
         setAge={setAge}
+        setSex={setSex}
+        setHeightCm={setHeightCm}
         onSave={saveAccountProfile}
       />
 
@@ -200,17 +232,25 @@ function ProfilePanel({
   firstName,
   lastName,
   age,
+  sex,
+  heightCm,
   setFirstName,
   setLastName,
   setAge,
+  setSex,
+  setHeightCm,
   onSave,
 }: {
   firstName: string;
   lastName: string;
   age: string;
+  sex: BiologicalSex | '';
+  heightCm: string;
   setFirstName: (value: string) => void;
   setLastName: (value: string) => void;
   setAge: (value: string) => void;
+  setSex: (value: BiologicalSex | '') => void;
+  setHeightCm: (value: string) => void;
   onSave: () => void;
 }) {
   const { t } = useI18n();
@@ -245,6 +285,32 @@ function ProfilePanel({
             max={120}
             value={age}
             onChange={(e) => setAge(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="account-sex">{t('account.sex')}</label>
+          <select
+            id="account-sex"
+            required
+            value={sex}
+            onChange={(e) => setSex(e.target.value as BiologicalSex | '')}
+          >
+            <option value="">{t('account.sexUnset')}</option>
+            <option value="male">{t('account.sex.male')}</option>
+            <option value="female">{t('account.sex.female')}</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="account-height">{t('account.height')}</label>
+          <input
+            id="account-height"
+            type="number"
+            min={120}
+            max={250}
+            required
+            value={heightCm}
+            onChange={(e) => setHeightCm(e.target.value)}
+            placeholder={t('account.heightPlaceholder')}
           />
         </div>
       </div>

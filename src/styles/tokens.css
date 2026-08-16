@@ -523,6 +523,9 @@ html[dir='rtl'] .brand {
 .filters select,
 .field select {
   appearance: none;
+  /* Si la place manque vraiment, on tronque proprement au lieu de laisser le
+     texte passer sous la flèche. */
+  text-overflow: ellipsis;
   padding-right: 2rem;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
@@ -1065,20 +1068,34 @@ html[dir='rtl'] .brand {
   gap: 0.5rem 0.6rem;
 }
 
-.editor-fields .field {
+/* Les listes déroulantes ont besoin de plus de place que les champs nombre de
+   l'éditeur : `min(100%, 13rem)` donne deux colonnes dans un modal et une
+   seule sur un écran étroit, sans jamais rogner le libellé de l'option. */
+.ai-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.editor-fields .field,
+.ai-fields .field {
   display: grid;
   grid-template-rows: subgrid;
   grid-row: span 2;
   gap: 0.35rem;
   margin-bottom: 0;
+  min-width: 0;
 }
 
-.editor-fields .field label {
+.editor-fields .field label,
+.ai-fields .field label {
   align-self: end;
 }
 
 @supports not (grid-template-rows: subgrid) {
-  .editor-fields .field {
+  .editor-fields .field,
+  .ai-fields .field {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -1163,6 +1180,200 @@ html[dir='rtl'] .brand {
   gap: 0.25rem;
   color: var(--warning);
   font-size: 0.8rem;
+}
+
+.ai-quota {
+  margin-bottom: 0.85rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.ai-equipment {
+  margin: 0 0 0.85rem;
+  padding: 0;
+  border: 0;
+}
+
+.ai-equipment legend {
+  padding: 0;
+  margin-bottom: 0.45rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.ai-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  text-transform: capitalize;
+}
+
+.ai-check input {
+  width: auto;
+  margin: 0;
+}
+
+.meal-kcal {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+/* Objectif calorique : jauge du jour, sur la page Nutrition et l'accueil. */
+.goal-track {
+  height: 0.55rem;
+  margin: 0.5rem 0 0.4rem;
+  border-radius: 999px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.goal-track-sm {
+  height: 0.35rem;
+  margin: 0.45rem 0 0;
+}
+
+.goal-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.goal-bar.over {
+  background: var(--danger);
+}
+
+.goal-status {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.goal-status.over {
+  color: var(--danger);
+}
+
+.goal-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.goal-form .field {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.goal-macro-block {
+  margin: 0.75rem 0 0.35rem;
+}
+
+.sheet-head-sm {
+  margin-bottom: 0.25rem;
+}
+
+.sheet-head-sm .muted {
+  margin: 0;
+}
+
+.nutrition-config {
+  margin-top: 0.85rem;
+}
+
+.nutrition-global-badge {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.nutrition-config-actions {
+  grid-column: 1 / -1;
+  align-self: end;
+}
+
+.nutrition-targets-hint {
+  margin-top: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.dashboard-stat-link {
+  margin-top: 0.3rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dashboard-stat .goal-track-sm + .goal-track-sm {
+  margin-top: 0.35rem;
+}
+
+.dashboard-stat-protein {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.meal-items {
+  margin: 0.35rem 0 0.75rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.meal-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.meal-macros {
+  font-size: 0.82rem;
+}
+
+.meal-log {
+  margin: 0.35rem 0 0.85rem;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.meal-log li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.meal-log li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .move-btns {
@@ -1361,9 +1572,29 @@ html[dir='rtl'] .brand {
   text-transform: uppercase;
 }
 
+.dashboard-global-goal {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+  font-size: 0.82rem;
+}
+
+.dashboard-global-goal span {
+  color: var(--text-muted);
+}
+
+.dashboard-global-goal a {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
@@ -1396,6 +1627,11 @@ html[dir='rtl'] .brand {
   font-size: clamp(1.6rem, 4vw, 2.25rem);
   line-height: 1.1;
   text-overflow: ellipsis;
+}
+
+.dashboard-stat:has(.goal-track) strong,
+.dashboard-stat:has(.dashboard-stat-link) strong {
+  font-size: clamp(1.15rem, 2.8vw, 1.55rem);
 }
 
 .dashboard-stat small {

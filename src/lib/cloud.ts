@@ -1,6 +1,7 @@
 import type {
   AppData,
   Exercise,
+  Meal,
   Program,
   ProgramShare,
   SentProgramShare,
@@ -43,6 +44,10 @@ type ProfileRow = {
   first_name: string;
   last_name: string;
   age: number;
+  sex: string | null;
+  height_cm: number | null;
+  goal: string | null;
+  sessions_per_week: number | null;
 };
 
 type WeightEntryRow = {
@@ -50,6 +55,30 @@ type WeightEntryRow = {
   weight_kg: number;
   recorded_at: string;
 };
+
+type MealRow = {
+  id: string;
+  label: string;
+  kcal: number;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  items: Meal['items'] | null;
+  eaten_at: string;
+};
+
+function mapMeals(rows: MealRow[]): Meal[] {
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    kcal: Number(row.kcal),
+    proteinG: Number(row.protein_g ?? 0),
+    carbsG: Number(row.carbs_g ?? 0),
+    fatG: Number(row.fat_g ?? 0),
+    items: row.items ?? [],
+    eatenAt: row.eaten_at,
+  }));
+}
 
 type ProgramShareRow = {
   id: string;
@@ -84,14 +113,30 @@ function requireClient() {
   return supabase;
 }
 
-export async function fetchCloudData(): Promise<AppData> {
+/**
+ * `localProfile` sert de repli quand les colonnes nutrition ne sont pas encore
+ * migrées : sans lui, un pull effacerait sexe/taille/objectif du localStorage.
+ */
+export async function fetchCloudData(
+  localProfile?: UserProfile,
+): Promise<AppData> {
   const client = requireClient();
-  const [programsRes, sessionsRes, customRes, profileRes, weightsRes, sharesRes] =
-    await Promise.all([
+  const [
+    programsRes,
+    sessionsRes,
+    customRes,
+    profileRes,
+    weightsRes,
+    sharesRes,
+    mealsRes,
+  ] = await Promise.all([
     client.from('programs').select('*').order('updated_at', { ascending: false }),
     client.from('sessions').select('*').order('started_at', { ascending: false }),
     client.from('custom_exercises').select('*').order('created_at', { ascending: false }),
-    client.from('profiles').select('first_name,last_name,age').maybeSingle(),
+    client
+      .from('profiles')
+      .select('first_name,last_name,age,sex,height_cm,goal,sessions_per_week')
+      .maybeSingle(),
     client.from('weight_entries').select('*').order('recorded_at', { ascending: true }),
     client
       .from('program_shares')
@@ -100,17 +145,36 @@ export async function fetchCloudData(): Promise<AppData> {
       )
       .eq('status', 'pending')
       .order('created_at', { ascending: false }),
+    client.from('meals').select('*').order('eaten_at', { ascending: false }),
   ]);
 
   if (programsRes.error) throw programsRes.error;
   if (sessionsRes.error) throw sessionsRes.error;
   if (customRes.error) throw customRes.error;
-  if (profileRes.error) throw profileRes.error;
+  let profileData = profileRes.data;
+  if (profileRes.error) {
+    if (!isMissingColumn(profileRes.error)) throw profileRes.error;
+    const fallback = await client
+      .from('profiles')
+      .select('first_name,last_name,age')
+      .maybeSingle();
+    if (fallback.error) throw fallback.error;
+    profileData = fallback.data
+      ? {
+          ...fallback.data,
+          sex: localProfile?.sex ?? null,
+          height_cm: localProfile?.heightCm ?? null,
+          goal: localProfile?.goal ?? null,
+          sessions_per_week: localProfile?.sessionsPerWeek ?? null,
+        }
+      : null;
+  }
   if (weightsRes.error) throw weightsRes.error;
   // Permet de déployer le client avant d’exécuter la migration de partage.
-  const sharingUnavailable =
-    sharesRes.error?.code === '42P01' || sharesRes.error?.code === 'PGRST205';
+  const sharingUnavailable = isMissingTable(sharesRes.error);
   if (sharesRes.error && !sharingUnavailable) throw sharesRes.error;
+  const mealsUnavailable = isMissingTable(mealsRes.error);
+  if (mealsRes.error && !mealsUnavailable) throw mealsRes.error;
 
   const programs = (programsRes.data as ProgramRow[]).map((row) => ({
     id: row.id,
@@ -142,12 +206,30 @@ export async function fetchCloudData(): Promise<AppData> {
     custom: true as const,
   }));
 
-  const profileRow = profileRes.data as ProfileRow | null;
+  const profileRow = profileData as ProfileRow | null;
   const profile: UserProfile | undefined = profileRow
     ? {
         firstName: profileRow.first_name,
         lastName: profileRow.last_name,
         age: profileRow.age,
+        sex:
+          profileRow.sex === 'male' || profileRow.sex === 'female'
+            ? profileRow.sex
+            : undefined,
+        heightCm:
+          profileRow.height_cm != null ? Number(profileRow.height_cm) : undefined,
+        goal:
+          profileRow.goal === 'masse' ||
+          profileRow.goal === 'perte' ||
+          profileRow.goal === 'force' ||
+          profileRow.goal === 'endurance' ||
+          profileRow.goal === 'forme'
+            ? profileRow.goal
+            : undefined,
+        sessionsPerWeek:
+          profileRow.sessions_per_week != null
+            ? Number(profileRow.sessions_per_week)
+            : undefined,
       }
     : undefined;
   const weightEntries = (weightsRes.data as WeightEntryRow[]).map((row) => ({
@@ -158,6 +240,9 @@ export async function fetchCloudData(): Promise<AppData> {
   const incomingProgramShares: ProgramShare[] = sharingUnavailable
     ? []
     : mapProgramShares((sharesRes.data ?? []) as ProgramShareRow[]);
+  const meals: Meal[] = mealsUnavailable
+    ? []
+    : mapMeals((mealsRes.data ?? []) as MealRow[]);
 
   return {
     programs,
@@ -166,7 +251,22 @@ export async function fetchCloudData(): Promise<AppData> {
     profile,
     weightEntries,
     incomingProgramShares,
+    meals,
   };
+}
+
+/** La table n'existe pas encore : la migration correspondante n'est pas jouée. */
+function isMissingTable(error: { code?: string } | null): boolean {
+  return error?.code === '42P01' || error?.code === 'PGRST205';
+}
+
+/** Colonnes nutrition absentes tant que la migration n’est pas jouée. */
+function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
+  return (
+    error?.code === 'PGRST204' ||
+    error?.code === '42703' ||
+    /column .* does not exist/i.test(error?.message ?? '')
+  );
 }
 
 export async function pushAllData(data: AppData, userId: string): Promise<void> {
@@ -234,6 +334,48 @@ export async function pushAllData(data: AppData, userId: string): Promise<void> 
     );
     if (error) throw error;
   }
+
+  if (data.meals.length) {
+    const { error } = await client.from('meals').upsert(
+      data.meals.map((meal) => ({
+        id: meal.id,
+        user_id: userId,
+        label: meal.label,
+        kcal: meal.kcal,
+        protein_g: meal.proteinG,
+        carbs_g: meal.carbsG,
+        fat_g: meal.fatG,
+        items: meal.items,
+        eaten_at: meal.eatenAt,
+      })),
+    );
+    if (error && !isMissingTable(error)) throw error;
+  }
+}
+
+export async function upsertMealCloud(
+  meal: Meal,
+  userId: string,
+): Promise<void> {
+  const client = requireClient();
+  const { error } = await client.from('meals').upsert({
+    id: meal.id,
+    user_id: userId,
+    label: meal.label,
+    kcal: meal.kcal,
+    protein_g: meal.proteinG,
+    carbs_g: meal.carbsG,
+    fat_g: meal.fatG,
+    items: meal.items,
+    eaten_at: meal.eatenAt,
+  });
+  if (error) throw error;
+}
+
+export async function deleteMealCloud(id: string): Promise<void> {
+  const client = requireClient();
+  const { error } = await client.from('meals').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function upsertProfileCloud(
@@ -241,14 +383,28 @@ export async function upsertProfileCloud(
   userId: string,
 ): Promise<void> {
   const client = requireClient();
-  const { error } = await client.from('profiles').upsert({
+  const fullRow = {
+    user_id: userId,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    age: profile.age,
+    sex: profile.sex ?? null,
+    height_cm: profile.heightCm ?? null,
+    goal: profile.goal ?? null,
+    sessions_per_week: profile.sessionsPerWeek ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await client.from('profiles').upsert(fullRow);
+  if (!error) return;
+  if (!isMissingColumn(error)) throw error;
+  const { error: fallbackError } = await client.from('profiles').upsert({
     user_id: userId,
     first_name: profile.firstName,
     last_name: profile.lastName,
     age: profile.age,
     updated_at: new Date().toISOString(),
   });
-  if (error) throw error;
+  if (fallbackError) throw fallbackError;
 }
 
 export async function upsertWeightEntryCloud(

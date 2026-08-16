@@ -1,6 +1,7 @@
 import type {
   AppData,
   Exercise,
+  Meal,
   Program,
   ProgramExercise,
   Session,
@@ -10,10 +11,12 @@ import type {
 import type { Locale } from '../i18n/messages';
 import { EXERCISES, getExerciseById as getBuiltInExercise } from '../data/exercises';
 import {
+  deleteMealCloud,
   deleteProgramCloud,
   deleteSessionCloud,
   deleteWeightEntryCloud,
   syncQuietly,
+  upsertMealCloud,
   upsertCustomExerciseCloud,
   upsertProfileCloud,
   upsertProgramCloud,
@@ -121,6 +124,7 @@ function defaultData(): AppData {
     customExercises: [],
     weightEntries: [],
     incomingProgramShares: [],
+    meals: [],
   };
 }
 
@@ -140,6 +144,7 @@ export function loadData(): AppData {
       profile: parsed.profile,
       weightEntries: parsed.weightEntries ?? [],
       incomingProgramShares: parsed.incomingProgramShares ?? [],
+      meals: parsed.meals ?? [],
     };
   } catch {
     return defaultData();
@@ -203,6 +208,42 @@ export function deleteWeightEntry(id: string): AppData {
   return data;
 }
 
+export function addMeal(meal: Omit<Meal, 'id'>): AppData {
+  const data = loadData();
+  const entry: Meal = { ...meal, id: uid() };
+  data.meals = [entry, ...data.meals];
+  saveData(data);
+  const userId = cloudUserId();
+  if (isSupabaseConfigured && userId) {
+    syncQuietly(() => upsertMealCloud(entry, userId));
+  }
+  return data;
+}
+
+export function deleteMeal(id: string): AppData {
+  const data = loadData();
+  data.meals = data.meals.filter((meal) => meal.id !== id);
+  saveData(data);
+  if (isSupabaseConfigured && cloudUserId()) {
+    syncQuietly(() => deleteMealCloud(id));
+  }
+  return data;
+}
+
+/** Repas du jour civil en cours, les plus récents d'abord. */
+export function mealsOfDay(meals: Meal[], day = new Date()): Meal[] {
+  const key = dayKey(day);
+  return meals
+    .filter((meal) => dayKey(new Date(meal.eatenAt)) === key)
+    .sort(
+      (a, b) => new Date(b.eatenAt).getTime() - new Date(a.eatenAt).getTime(),
+    );
+}
+
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
 export function exportData(): string {
   return JSON.stringify(loadData(), null, 2);
 }
@@ -219,6 +260,7 @@ export function importData(json: string): AppData {
     profile: parsed.profile,
     weightEntries: parsed.weightEntries ?? [],
     incomingProgramShares: parsed.incomingProgramShares ?? [],
+    meals: parsed.meals ?? [],
   };
   saveData(data);
   return data;

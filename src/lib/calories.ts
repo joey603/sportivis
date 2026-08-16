@@ -8,10 +8,14 @@ export type UserSettings = {
   bodyWeightKg: number;
 };
 
+const DEFAULT_SETTINGS: UserSettings = {
+  bodyWeightKg: DEFAULT_BODY_WEIGHT_KG,
+};
+
 export function loadSettings(): UserSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { bodyWeightKg: DEFAULT_BODY_WEIGHT_KG };
+    if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<UserSettings>;
     const weight = Number(parsed.bodyWeightKg);
     return {
@@ -21,14 +25,18 @@ export function loadSettings(): UserSettings {
           : DEFAULT_BODY_WEIGHT_KG,
     };
   } catch {
-    return { bodyWeightKg: DEFAULT_BODY_WEIGHT_KG };
+    return { ...DEFAULT_SETTINGS };
   }
 }
 
 export function saveBodyWeightKg(kg: number): UserSettings {
-  const settings: UserSettings = {
+  return writeSettings({
     bodyWeightKg: Math.min(300, Math.max(30, Math.round(kg * 10) / 10)),
-  };
+  });
+}
+
+function writeSettings(patch: Partial<UserSettings>): UserSettings {
+  const settings: UserSettings = { ...loadSettings(), ...patch };
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   window.dispatchEvent(new Event('sportivis-data'));
   return settings;

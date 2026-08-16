@@ -17,6 +17,7 @@ export function Layout() {
     { to: '/accueil', label: t('nav.home') },
     { to: '/exercices', label: t('nav.exercises') },
     { to: '/programmes', label: t('nav.programs') },
+    { to: '/nutrition', label: t('nav.nutrition') },
     { to: '/historique', label: t('nav.history') },
     { to: '/compte', label: t('nav.account') },
   ];

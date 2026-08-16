@@ -18,10 +18,12 @@ import { setCloudUserId } from '../lib/cloudUser';
 import { clearSettings, saveBodyWeightKg } from '../lib/calories';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { clearLocalData, loadData, saveData } from '../lib/storage';
-import type { UserProfile, WeightEntry } from '../types';
+import type { BiologicalSex, UserProfile, WeightEntry } from '../types';
 
-export type SignUpDetails = UserProfile & {
+export type SignUpDetails = Omit<UserProfile, 'sex' | 'heightCm'> & {
   weightKg: number;
+  sex: BiologicalSex;
+  heightCm: number;
 };
 
 type AuthContextValue = {
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSyncing(true);
       setError(null);
       try {
-        const cloud = await fetchCloudData();
+        const cloud = await fetchCloudData(loadData().profile);
         if (cancelled) return;
         const hasCloud =
           cloud.programs.length > 0 ||
@@ -146,6 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             first_name: details.firstName,
             last_name: details.lastName,
             age: details.age,
+            sex: details.sex,
+            height_cm: details.heightCm,
           },
         },
       });
@@ -158,6 +162,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firstName: details.firstName,
         lastName: details.lastName,
         age: details.age,
+        sex: details.sex,
+        heightCm: details.heightCm,
+        goal: details.goal,
+        sessionsPerWeek: details.sessionsPerWeek,
       };
       const weightEntry: WeightEntry = {
         id: crypto.randomUUID(),
@@ -208,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSyncing(true);
     setError(null);
     try {
-      const cloud = await fetchCloudData();
+      const cloud = await fetchCloudData(loadData().profile);
       saveData(cloud);
       const latestWeight = cloud.weightEntries.at(-1);
       if (latestWeight) saveBodyWeightKg(latestWeight.weightKg);

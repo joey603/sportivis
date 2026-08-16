@@ -43,6 +43,16 @@ create table if not exists public.profiles (
   first_name text not null,
   last_name text not null,
   age integer not null check (age between 13 and 120),
+  sex text check (sex is null or sex in ('male', 'female')),
+  height_cm integer check (height_cm is null or height_cm between 120 and 250),
+  goal text check (
+    goal is null
+    or goal in ('masse', 'perte', 'force', 'endurance', 'forme')
+  ),
+  sessions_per_week integer check (
+    sessions_per_week is null
+    or sessions_per_week between 1 and 7
+  ),
   updated_at timestamptz not null default now()
 );
 

@@ -106,16 +106,52 @@ export type Session = {
   logs: ExerciseLog[];
 };
 
+export type BiologicalSex = 'male' | 'female';
+
+/** Aligné sur les objectifs IA / programmes. */
+export type NutritionGoal =
+  | 'masse'
+  | 'perte'
+  | 'force'
+  | 'endurance'
+  | 'forme';
+
 export type UserProfile = {
   firstName: string;
   lastName: string;
   age: number;
+  sex?: BiologicalSex;
+  heightCm?: number;
+  goal?: NutritionGoal;
+  /** Séances d'entraînement prévues par semaine (1–7). */
+  sessionsPerWeek?: number;
 };
 
 export type WeightEntry = {
   id: string;
   weightKg: number;
   recordedAt: string;
+};
+
+export type MealItem = {
+  name: string;
+  /** Quantité estimée, unité comprise (« 150 g », « 1 bol »). */
+  quantity: string;
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+};
+
+export type Meal = {
+  id: string;
+  label: string;
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  items: MealItem[];
+  eatenAt: string;
 };
 
 export type AppData = {
@@ -125,4 +161,5 @@ export type AppData = {
   profile?: UserProfile;
   weightEntries: WeightEntry[];
   incomingProgramShares: ProgramShare[];
+  meals: Meal[];
 };

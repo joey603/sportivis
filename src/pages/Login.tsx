@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { isSupabaseConfigured } from '../lib/supabase';
+import type { BiologicalSex } from '../types';
 
 type Mode = 'signin' | 'signup';
 
@@ -17,6 +18,8 @@ export function Login() {
   const [lastName, setLastName] = useState('');
   const [age, setAge] = useState('');
   const [weightKg, setWeightKg] = useState('');
+  const [sex, setSex] = useState<BiologicalSex | ''>('');
+  const [heightCm, setHeightCm] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,11 +62,18 @@ export function Login() {
         navigate(from, { replace: true });
         return;
       }
+      const height = Number(heightCm);
+      if (!sex || !Number.isFinite(height) || height < 120 || height > 250) {
+        setMessage(t('account.profileRequired'));
+        return;
+      }
       await auth.signUp(email.trim(), password, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         age: Number(age),
         weightKg: Number(weightKg.replace(',', '.')),
+        sex,
+        heightCm: height,
       });
       navigate(from, { replace: true });
     } catch (err) {
@@ -134,6 +144,32 @@ export function Login() {
                 onChange={(e) => setWeightKg(e.target.value)}
               />
             </div>
+            <div className="field">
+              <label htmlFor="signup-sex">{t('account.sex')}</label>
+              <select
+                id="signup-sex"
+                required
+                value={sex}
+                onChange={(e) => setSex(e.target.value as BiologicalSex | '')}
+              >
+                <option value="">{t('account.sexUnset')}</option>
+                <option value="male">{t('account.sex.male')}</option>
+                <option value="female">{t('account.sex.female')}</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="signup-height">{t('account.height')}</label>
+              <input
+                id="signup-height"
+                type="number"
+                min={120}
+                max={250}
+                required
+                value={heightCm}
+                onChange={(e) => setHeightCm(e.target.value)}
+                placeholder={t('account.heightPlaceholder')}
+              />
+            </div>
           </div>
         )}
 
@@ -196,7 +232,7 @@ export function Login() {
 function translateError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
   if (/invalid login credentials/i.test(raw)) {
-    return 'Email ou mot de passe incorrect.';
+    return 'email ou mot de passe incorrect.';
   }
   if (/user already registered/i.test(raw)) {
     return 'Un compte existe déjà avec cet email.';

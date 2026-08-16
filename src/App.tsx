@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Exercises } from './pages/Exercises';
 import { History } from './pages/History';
 import { Login } from './pages/Login';
+import { Nutrition } from './pages/Nutrition';
 import { ProgramEditor } from './pages/ProgramEditor';
 import { Programs } from './pages/Programs';
 import { Workout } from './pages/Workout';
@@ -45,6 +46,7 @@ export default function App() {
                 <Route path="programmes" element={<Programs />} />
                 <Route path="programmes/:id" element={<ProgramEditor />} />
                 <Route path="seance/:programId" element={<Workout />} />
+                <Route path="nutrition" element={<Nutrition />} />
                 <Route path="historique" element={<History />} />
                 <Route path="compte" element={<Account />} />
               </Route>

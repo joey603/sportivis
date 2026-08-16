@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
+import { GenerateProgramDialog } from '../components/GenerateProgramDialog';
 import { ImportProgram } from '../components/ImportProgram';
 import { useI18n } from '../i18n/I18nContext';
 import type { ImportedProgram } from '../lib/programExchange';
@@ -42,6 +43,7 @@ export function ProgramEditor() {
   });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -207,6 +209,13 @@ export function ProgramEditor() {
             onClick={() => setPickerOpen(true)}
           >
             + Ajouter
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setGenerateOpen(true)}
+          >
+            {t('ai.generate')}
           </button>
           <button
             type="button"
@@ -413,6 +422,14 @@ export function ProgramEditor() {
         <ExercisePicker
           onPick={addExercise}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {generateOpen && (
+        <GenerateProgramDialog
+          currentCount={program.exercises.length}
+          onImport={applyImport}
+          onClose={() => setGenerateOpen(false)}
         />
       )}
 

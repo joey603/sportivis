@@ -9,8 +9,13 @@ import {
   sessionCaloriesKcal,
 } from '../lib/calories';
 import {
+  compareDayIntake,
+  resolveDailyTargets,
+} from '../lib/nutritionGoals';
+import {
   addWeightEntry,
   deleteWeightEntry,
+  mealsOfDay,
   sessionDurationMin,
   sessionVolumeKg,
 } from '../lib/storage';
@@ -38,9 +43,24 @@ export function Dashboard() {
   const [data, setData] = useAppData();
   const [newWeight, setNewWeight] = useState('');
   const [weightError, setWeightError] = useState<string | null>(null);
-  const bodyWeightKg = loadSettings().bodyWeightKg;
+  const settings = loadSettings();
+  const bodyWeightKg = settings.bodyWeightKg;
   const dayLabels = locale === 'he' ? DAY_LABELS_HE : DAY_LABELS_FR;
   const numberLocale = intlLocale(locale);
+
+  const todayMeals = useMemo(
+    () => mealsOfDay(data.meals),
+    [data.meals],
+  );
+  const targets = useMemo(
+    () => resolveDailyTargets(data.profile, bodyWeightKg),
+    [data.profile, bodyWeightKg],
+  );
+  const intake = useMemo(
+    () => (targets ? compareDayIntake(todayMeals, targets) : null),
+    [todayMeals, targets],
+  );
+  const intakeToday = intake?.kcal.actual ?? todayMeals.reduce((sum, meal) => sum + meal.kcal, 0);
 
   const summary = useMemo(() => {
     const sessions = data.sessions
@@ -67,14 +87,6 @@ export function Dashboard() {
       if (day) day.sessions += 1;
     }
 
-    const weekSessions = sessions.filter((session) => {
-      const started = new Date(session.startedAt);
-      const start = new Date(today);
-      start.setHours(0, 0, 0, 0);
-      start.setDate(today.getDate() - 6);
-      return started >= start;
-    });
-
     return {
       sessions,
       days,
@@ -83,16 +95,8 @@ export function Dashboard() {
         (total, session) => total + (sessionDurationMin(session) ?? 0),
         0,
       ),
-      totalVolume: sessions.reduce(
-        (total, session) => total + sessionVolumeKg(session),
-        0,
-      ),
-      weekCalories: weekSessions.reduce(
-        (total, session) => total + sessionCaloriesKcal(session, bodyWeightKg),
-        0,
-      ),
     };
-  }, [data.sessions, bodyWeightKg, dayLabels]);
+  }, [data.sessions, dayLabels]);
 
   const lastSession = summary.sessions[0];
   const maxDaySessions = Math.max(1, ...summary.days.map((day) => day.sessions));
@@ -129,6 +133,14 @@ export function Dashboard() {
               : t('dashboard.title')}
           </h1>
           <p className="muted">{t('dashboard.lead')}</p>
+          <div className="dashboard-global-goal">
+            <span>{t('dashboard.globalGoal')}</span>
+            <Link to="/nutrition">
+              {data.profile?.goal
+                ? t(`ai.goal.${data.profile.goal}`)
+                : t('dashboard.globalGoalUnset')}
+            </Link>
+          </div>
         </div>
         <Link to="/programmes" className="btn btn-secondary">
           {t('dashboard.managePrograms')}
@@ -147,16 +159,53 @@ export function Dashboard() {
           <small>{t('dashboard.totalTimeHint')}</small>
         </article>
         <article className="dashboard-stat">
-          <span>{t('dashboard.totalVolume')}</span>
-          <strong>
-            {Math.round(summary.totalVolume).toLocaleString(numberLocale)}
-          </strong>
-          <small>{t('dashboard.totalVolumeHint')}</small>
-        </article>
-        <article className="dashboard-stat">
-          <span>{t('dashboard.calories')}</span>
-          <strong>{summary.weekCalories.toLocaleString(numberLocale)}</strong>
-          <small>{t('dashboard.caloriesHint')}</small>
+          <span>{t('dashboard.intake')}</span>
+          {intake && targets ? (
+            <>
+              <strong>
+                {t('dashboard.intakeProgress', {
+                  consumed: intakeToday.toLocaleString(numberLocale),
+                  goal: targets.kcal.toLocaleString(numberLocale),
+                })}
+              </strong>
+              <small>{t('units.kcal')}</small>
+              <div className="goal-track goal-track-sm">
+                <span
+                  className={intake.kcal.over ? 'goal-bar over' : 'goal-bar'}
+                  style={{ width: `${intake.kcal.percent}%` }}
+                />
+              </div>
+              <span className="dashboard-stat-protein">
+                {t('dashboard.intakeProteinProgress', {
+                  consumed: Math.round(intake.protein.actual).toLocaleString(
+                    numberLocale,
+                  ),
+                  goal: targets.proteinG.toLocaleString(numberLocale),
+                })}
+              </span>
+              <div className="goal-track goal-track-sm">
+                <span
+                  className={
+                    intake.protein.over ? 'goal-bar over' : 'goal-bar'
+                  }
+                  style={{ width: `${intake.protein.percent}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <strong>
+                {t('dashboard.intakeProgress', {
+                  consumed: intakeToday.toLocaleString(numberLocale),
+                  goal: '—',
+                })}
+              </strong>
+              <small>{t('dashboard.intakeIncomplete')}</small>
+              <Link to="/nutrition" className="dashboard-stat-link">
+                {t('dashboard.intakeSetGoal')}
+              </Link>
+            </>
+          )}
         </article>
       </section>
 
