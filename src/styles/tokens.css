@@ -14,6 +14,8 @@
   --accent-dim: rgba(184, 242, 85, 0.15);
   --teal: #2ec4b6;
   --teal-dim: rgba(46, 196, 182, 0.15);
+  --violet: #c9a6ff;
+  --violet-dim: rgba(201, 166, 255, 0.15);
   --danger: #ff6b6b;
   --warning: #ffb347;
   --radius: 12px;
@@ -426,6 +428,16 @@ html[dir='rtl'] .brand {
   background: var(--teal-dim);
   color: var(--teal);
   border: 1px solid rgba(46, 196, 182, 0.35);
+}
+
+/* Actions déléguées à l'IA : palette distincte des actions manuelles. */
+.btn-ai {
+  background: var(--violet);
+  color: #0a1628;
+}
+
+.btn-ai:hover {
+  filter: brightness(1.05);
 }
 
 .btn-ghost {
@@ -930,13 +942,14 @@ html[dir='rtl'] .brand {
   margin-top: 0.65rem;
 }
 
-.shared-exercise-list {
+/* Aperçu en lecture seule des exercices d'un programme : partage et IA. */
+.program-preview-list {
   display: grid;
   gap: 0.55rem;
   margin: 1rem 0 1.25rem;
 }
 
-.shared-exercise-row {
+.program-preview-row {
   display: grid;
   grid-template-columns: 2rem minmax(0, 1fr);
   gap: 0.7rem;
@@ -946,12 +959,12 @@ html[dir='rtl'] .brand {
   background: var(--surface);
 }
 
-.shared-exercise-row p {
+.program-preview-row p {
   margin-top: 0.2rem;
   font-size: 0.84rem;
 }
 
-.shared-exercise-index {
+.program-preview-index {
   display: grid;
   place-items: center;
   width: 2rem;
@@ -962,7 +975,7 @@ html[dir='rtl'] .brand {
   font-weight: 700;
 }
 
-.shared-exercise-note {
+.program-preview-note {
   color: var(--text);
 }
 

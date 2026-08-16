@@ -212,7 +212,7 @@ export function ProgramEditor() {
           </button>
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
+            className="btn btn-ai btn-sm"
             onClick={() => setGenerateOpen(true)}
           >
             {t('ai.generate')}

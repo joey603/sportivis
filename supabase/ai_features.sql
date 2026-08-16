@@ -25,8 +25,8 @@ language sql
 immutable
 as $$
   select case p_feature
-           when 'program' then 10
-           when 'meal' then 40
+           when 'program' then 20
+           when 'meal' then 80
          end;
 $$;
 

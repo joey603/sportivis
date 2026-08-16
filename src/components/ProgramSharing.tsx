@@ -210,19 +210,19 @@ export function SharedProgramPreview({
           </button>
         </div>
 
-        <div className="shared-exercise-list">
+        <div className="program-preview-list">
           {share.program.exercises.map((item, index) => {
             const exercise =
               customById.get(item.exerciseId) ?? getExerciseById(item.exerciseId);
             return (
-              <div className="shared-exercise-row" key={item.id}>
-                <span className="mono shared-exercise-index">{index + 1}</span>
+              <div className="program-preview-row" key={item.id}>
+                <span className="mono program-preview-index">{index + 1}</span>
                 <div>
                   <strong>{exercise?.name ?? item.exerciseId}</strong>
                   <p className="muted">
                     {exerciseTarget(exercise, item)} · {formatSeconds(item.restSec)}
                   </p>
-                  {item.notes && <p className="shared-exercise-note">{item.notes}</p>}
+                  {item.notes && <p className="program-preview-note">{item.notes}</p>}
                 </div>
               </div>
             );

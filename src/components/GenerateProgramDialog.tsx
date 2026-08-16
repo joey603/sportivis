@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EQUIPMENT_TYPES } from '../data/exercises';
-import { localizeEquipment } from '../i18n/exercises';
+import { localizeEquipment, localizeExerciseName } from '../i18n/exercises';
 import { useI18n } from '../i18n/I18nContext';
 import {
   aiErrorCode,
@@ -9,7 +9,12 @@ import {
   generateProgramAi,
 } from '../lib/ai';
 import type { ImportedProgram } from '../lib/programExchange';
-import { loadData } from '../lib/storage';
+import {
+  formatExerciseTarget,
+  formatSeconds,
+  getExerciseById,
+  loadData,
+} from '../lib/storage';
 import type { MessageKey } from '../i18n/messages';
 
 type Props = {
@@ -139,6 +144,36 @@ export function GenerateProgramDialog({
               <strong>{result.program.name}</strong>
               {result.program.description ? ` · ${result.program.description}` : ''}
             </p>
+
+            <div className="program-preview-list">
+              {result.program.exercises.map((item, index) => {
+                const exercise = getExerciseById(item.exerciseId);
+                return (
+                  <div className="program-preview-row" key={item.id}>
+                    <span className="mono program-preview-index">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <strong>
+                        {exercise
+                          ? localizeExerciseName(exercise, locale)
+                          : item.exerciseId}
+                      </strong>
+                      <p className="muted">
+                        {`${item.sets} × ${formatExerciseTarget(item.exerciseId, item, locale)}`}
+                        {item.targetWeightKg
+                          ? ` · ${item.targetWeightKg} ${t('workout.kg')}`
+                          : ''}
+                        {` · ${t('workout.rest')} ${formatSeconds(item.restSec, locale)}`}
+                      </p>
+                      {item.notes && (
+                        <p className="program-preview-note">{item.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
             {result.warnings.length > 0 && (
               <ul className="exchange-warnings">
@@ -277,7 +312,7 @@ export function GenerateProgramDialog({
             <div className="row-actions">
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-ai"
                 disabled={busy || remaining === 0}
                 onClick={() => void generate()}
               >
