@@ -432,10 +432,11 @@ html[dir='rtl'] .brand {
   border: 1px solid rgba(46, 196, 182, 0.35);
 }
 
-/* Actions déléguées à l'IA : palette distincte des actions manuelles. */
+/* Même structure que .btn-secondary, en rose pour les actions IA. */
 .btn-ai {
-  background: var(--violet);
-  color: #0a1628;
+  background: var(--pink-dim);
+  color: var(--pink);
+  border: 1px solid rgba(255, 143, 199, 0.35);
 }
 
 .btn-ai:hover {
@@ -1071,6 +1072,15 @@ html[dir='rtl'] .brand {
   background: rgba(255, 107, 107, 0.12);
 }
 
+.editor-exercises {
+  margin-top: 1.25rem;
+}
+
+.editor-exercises > h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+}
+
 .editor-ex {
   display: grid;
   gap: 0.75rem;
@@ -1081,6 +1091,24 @@ html[dir='rtl'] .brand {
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.5rem;
+}
+
+.editor-ex-identity {
+  display: flex;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.editor-ex-copy {
+  min-width: 0;
+}
+
+.editor-ex-meta {
+  font-size: 0.85rem;
+}
+
+.editor-exercise-actions {
+  margin-top: 0.85rem;
 }
 
 .editor-fields {
