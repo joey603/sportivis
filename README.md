@@ -64,7 +64,10 @@ La génération de programme et l’analyse des repas passent par deux fonctions
 GROQ_API_KEY=...
 ```
 
-3. En production, déclare la même variable dans **Vercel → Project Settings → Environment Variables**, ainsi que `SUPABASE_URL` et `SUPABASE_ANON_KEY` (les variables `VITE_` ne sont pas lues à l’exécution des fonctions).
+3. En production, déclare dans **Vercel → Project Settings → Environment Variables** (cible **Production**, pas seulement Preview) :
+   - `GROQ_API_KEY` (obligatoire pour `/api/generate-program` et `/api/analyze-meal`)
+   - `SUPABASE_URL` et `SUPABASE_ANON_KEY` (recommandé ; sinon les `VITE_*` sont utilisées en repli)
+   Puis **redéploie**. Les variables `VITE_` seules suffisent au front, pas forcément aux fonctions serverless si elles ne sont pas exposées au runtime.
 4. Exécute [`supabase/ai_features.sql`](supabase/ai_features.sql) : il crée le journal alimentaire et le compteur de quota.
 
 Par défaut, les programmes utilisent `qwen/qwen3.6-27b` et les repas `openai/gpt-oss-20b`. Tu peux surcharger via `GROQ_MODEL_PROGRAM` / `GROQ_MODEL_MEAL` ; les anciens IDs Llama / gpt-oss-120b sont réécrits vers le 27b pour les programmes.

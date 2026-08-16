@@ -316,7 +316,14 @@ const fr = {
   'ai.err.missing_token': 'Connecte-toi pour utiliser la génération par IA.',
   'ai.err.invalid_token': 'Session expirée. Reconnecte-toi.',
   'ai.err.quota_exceeded': 'Quota du jour épuisé. Réessaie demain.',
-  'ai.err.server_not_configured': 'La génération par IA n’est pas configurée sur ce serveur.',
+  'ai.err.server_not_configured':
+    'La génération par IA n’est pas configurée sur ce serveur. Vérifie GROQ_API_KEY dans Vercel (Production).',
+  'ai.err.missing_groq_key':
+    'Clé Groq manquante : ajoute GROQ_API_KEY dans Vercel → Settings → Environment Variables (Production), puis redéploie.',
+  'ai.err.invalid_groq_key':
+    'Clé Groq invalide : régénère une clé sur console.groq.com et mets à jour GROQ_API_KEY sur Vercel.',
+  'ai.err.missing_supabase_config':
+    'Config Supabase manquante côté serveur : ajoute SUPABASE_URL et SUPABASE_ANON_KEY (ou les VITE_*) sur Vercel.',
   'ai.err.migration_missing': 'Migration IA manquante côté base de données.',
   'ai.err.ai_rate_limited': 'Le modèle est saturé. Réessaie dans une minute.',
   'ai.err.ai_overloaded': 'Le modèle est saturé (limite gratuite). Réessaie dans une minute.',
@@ -696,7 +703,14 @@ const he: Record<MessageKey, string> = {
   'ai.err.missing_token': 'התחבר כדי להשתמש ביצירה עם AI.',
   'ai.err.invalid_token': 'החיבור פג. התחבר מחדש.',
   'ai.err.quota_exceeded': 'המכסה היומית נגמרה. נסה מחר.',
-  'ai.err.server_not_configured': 'היצירה עם AI לא מוגדרת בשרת הזה.',
+  'ai.err.server_not_configured':
+    'היצירה עם AI לא מוגדרת בשרת. בדוק את GROQ_API_KEY ב-Vercel (Production).',
+  'ai.err.missing_groq_key':
+    'חסר מפתח Groq: הוסף GROQ_API_KEY ב-Vercel → Settings → Environment Variables (Production) ואז פרוס מחדש.',
+  'ai.err.invalid_groq_key':
+    'מפתח Groq לא תקין: צור מפתח חדש ב-console.groq.com ועדכן את GROQ_API_KEY ב-Vercel.',
+  'ai.err.missing_supabase_config':
+    'חסרה הגדרת Supabase בשרת: הוסף SUPABASE_URL ו-SUPABASE_ANON_KEY (או VITE_*) ב-Vercel.',
   'ai.err.migration_missing': 'חסרה מיגרציית AI בבסיס הנתונים.',
   'ai.err.ai_rate_limited': 'המודל עמוס. נסה בעוד דקה.',
   'ai.err.ai_overloaded': 'המודל עמוס (מגבלת התוכנית החינמית). נסה בעוד דקה.',

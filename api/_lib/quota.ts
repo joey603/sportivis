@@ -9,8 +9,16 @@ export async function consumeQuota(
   token: string,
   feature: 'program' | 'meal',
 ): Promise<number> {
-  const url = requireEnv('SUPABASE_URL', 'VITE_SUPABASE_URL');
-  const anonKey = requireEnv('SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+  const url = requireEnv(
+    'SUPABASE_URL',
+    'VITE_SUPABASE_URL',
+    'missing_supabase_config',
+  );
+  const anonKey = requireEnv(
+    'SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_ANON_KEY',
+    'missing_supabase_config',
+  );
 
   const response = await fetch(`${url}/rest/v1/rpc/consume_ai_quota`, {
     method: 'POST',
@@ -49,10 +57,23 @@ export async function consumeQuota(
   return typeof payload === 'number' ? payload : 0;
 }
 
-export function requireEnv(name: string, fallbackName?: string): string {
+export function requireEnv(
+  name: string,
+  fallbackName?: string,
+  missingCode = 'server_not_configured',
+): string {
   const raw =
     process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined);
-  const value = raw?.trim();
-  if (!value) throw new HttpError(503, 'server_not_configured');
+  // Vercel colle parfois des guillemets autour de la valeur collée.
+  const value = raw?.trim().replace(/^['"]|['"]$/g, '');
+  if (!value) throw new HttpError(503, missingCode);
   return value;
+}
+
+export function requireGroqApiKey(): string {
+  const key = requireEnv('GROQ_API_KEY', undefined, 'missing_groq_key');
+  if (/^(votre_|your_|xxx|changeme|replace)/i.test(key)) {
+    throw new HttpError(503, 'missing_groq_key');
+  }
+  return key;
 }

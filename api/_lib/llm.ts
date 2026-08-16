@@ -1,5 +1,5 @@
 import { HttpError } from './http.js';
-import { requireEnv } from './quota.js';
+import { requireGroqApiKey } from './quota.js';
 
 /**
  * Client LLM via Groq (API compatible OpenAI).
@@ -40,10 +40,7 @@ export type JsonSchema = {
 };
 
 export function assertLlmConfigured(): void {
-  const key = requireEnv('GROQ_API_KEY');
-  if (/^(votre_|your_|xxx|changeme|replace)/i.test(key)) {
-    throw new HttpError(503, 'server_not_configured');
-  }
+  requireGroqApiKey();
 }
 
 type GroqMessage = {
@@ -68,10 +65,7 @@ export async function generateJson<T>(options: {
   purpose: AiPurpose;
   temperature?: number;
 }): Promise<T> {
-  const apiKey = requireEnv('GROQ_API_KEY');
-  if (/^(votre_|your_|xxx|changeme|replace)/i.test(apiKey)) {
-    throw new HttpError(503, 'server_not_configured');
-  }
+  const apiKey = requireGroqApiKey();
   const model = resolveModel(options.purpose);
   // Les modèles Groq en mode `json_object` exigent le mot « JSON » dans le prompt.
   const system = `${options.systemInstruction}\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans texte autour, respectant exactement cette forme :\n${describeSchema(options.schema)}`;
@@ -105,9 +99,10 @@ function buildRequestBody(
     ],
     response_format: { type: 'json_object' },
   };
-  // gpt-oss / qwen3 : limiter le raisonnement pour garder du budget tokens JSON.
-  if (model.includes('gpt-oss') || model.includes('qwen3')) {
-    payload.reasoning_effort = model.includes('qwen3') ? 'none' : 'low';
+  // Qwen3 raisonne par défaut : on le coupe pour les réponses JSON courtes.
+  // gpt-oss (repas) : pas de reasoning_effort — plus compatible json_object.
+  if (model.includes('qwen3')) {
+    payload.reasoning_effort = 'none';
   }
   return JSON.stringify(payload);
 }
@@ -180,7 +175,6 @@ async function requestOnce<T>(
 
   if (!response.ok) {
     const groqMessage = payload?.error?.message ?? '';
-    // 413 = requête trop grosse pour le plafond TPM du modèle (ex. 120b free).
     if (
       response.status === 429 ||
       response.status === 503 ||
@@ -193,16 +187,14 @@ async function requestOnce<T>(
         error: new HttpError(response.status === 413 ? 429 : response.status, 'ai_overloaded'),
       };
     }
-    // Clé absente / invalide.
     if (response.status === 401) {
       console.error('[groq]', groqMessage);
       return {
         ok: false,
         retryable: false,
-        error: new HttpError(503, 'server_not_configured'),
+        error: new HttpError(503, 'invalid_groq_key'),
       };
     }
-    // 403 = souvent modèle non autorisé sur ce compte, pas une clé manquante.
     if (response.status === 403) {
       console.error('[groq]', model, groqMessage);
       return {
@@ -246,7 +238,6 @@ async function requestOnce<T>(
   }
 }
 
-/** Contenu utile : `content` d'abord, sinon JSON extrait du champ reasoning. */
 function extractJsonText(message: GroqMessage | undefined): string {
   const content = message?.content?.trim() ?? '';
   if (content) return content;
