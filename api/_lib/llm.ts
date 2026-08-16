@@ -2,15 +2,24 @@ import { HttpError } from './http.js';
 import { requireEnv } from './quota.js';
 
 /**
- * Client LLM via Groq (API compatible OpenAI). Le tier gratuit offre bien plus
- * de marge que Gemini Flash : ~14 400 req/jour sur le 8B (nutrition) et
- * ~1 000 req/jour sur le 70B (programmes).
+ * Client LLM via Groq (API compatible OpenAI). Les anciens Llama 3.1 / 3.3
+ * ont été retirés le 16/08/2026 : on pointe vers les remplacements officiels
+ * (gpt-oss), avec un alias pour les anciennes variables d'environnement.
  */
-const DEFAULT_MODEL_PROGRAM = 'llama-3.3-70b-versatile';
-const DEFAULT_MODEL_MEAL = 'llama-3.1-8b-instant';
+const DEFAULT_MODEL_PROGRAM = 'openai/gpt-oss-120b';
+const DEFAULT_MODEL_MEAL = 'openai/gpt-oss-20b';
 const TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [700, 1800];
+
+/** Anciens IDs encore présents dans des `.env` / Vercel → remplacements Groq. */
+const MODEL_ALIASES: Record<string, string> = {
+  'llama-3.1-8b-instant': DEFAULT_MODEL_MEAL,
+  'llama-3.3-70b-versatile': DEFAULT_MODEL_PROGRAM,
+  'llama-3.1-70b-versatile': DEFAULT_MODEL_PROGRAM,
+  'llama3-70b-8192': DEFAULT_MODEL_PROGRAM,
+  'llama3-8b-8192': DEFAULT_MODEL_MEAL,
+};
 
 export type AiPurpose = 'program' | 'meal';
 
@@ -76,10 +85,12 @@ export async function generateJson<T>(options: {
 }
 
 function resolveModel(purpose: AiPurpose): string {
-  if (purpose === 'meal') {
-    return process.env.GROQ_MODEL_MEAL ?? DEFAULT_MODEL_MEAL;
-  }
-  return process.env.GROQ_MODEL_PROGRAM ?? DEFAULT_MODEL_PROGRAM;
+  const configured =
+    purpose === 'meal'
+      ? (process.env.GROQ_MODEL_MEAL ?? DEFAULT_MODEL_MEAL)
+      : (process.env.GROQ_MODEL_PROGRAM ?? DEFAULT_MODEL_PROGRAM);
+  const trimmed = configured.trim();
+  return MODEL_ALIASES[trimmed] ?? trimmed;
 }
 
 /**
@@ -140,25 +151,45 @@ async function requestOnce<T>(
     | null;
 
   if (!response.ok) {
+    const groqMessage = payload?.error?.message ?? '';
     if (response.status === 429 || response.status === 503) {
-      console.error(
-        `[groq] ${response.status} ${model}: ${payload?.error?.message ?? 'overloaded'}`,
-      );
+      console.error(`[groq] ${response.status} ${model}: ${groqMessage || 'overloaded'}`);
       return {
         ok: false,
         retryable: true,
         error: new HttpError(response.status, 'ai_overloaded'),
       };
     }
-    if (response.status === 400 || response.status === 401 || response.status === 403) {
-      console.error('[groq]', payload?.error?.message);
+    // Clé absente / invalide côté Groq → vraiment une mauvaise config serveur.
+    if (response.status === 401 || response.status === 403) {
+      console.error('[groq]', groqMessage);
       return {
         ok: false,
         retryable: false,
         error: new HttpError(503, 'server_not_configured'),
       };
     }
-    console.error('[groq]', response.status, payload?.error?.message);
+    // Modèle retiré ou inconnu : ne plus afficher « non configuré ».
+    if (
+      response.status === 400 &&
+      /model|decommission|not found|does not exist/i.test(groqMessage)
+    ) {
+      console.error('[groq]', model, groqMessage);
+      return {
+        ok: false,
+        retryable: false,
+        error: new HttpError(502, 'ai_unreachable'),
+      };
+    }
+    if (response.status === 400) {
+      console.error('[groq]', groqMessage);
+      return {
+        ok: false,
+        retryable: false,
+        error: new HttpError(502, 'ai_blocked'),
+      };
+    }
+    console.error('[groq]', response.status, groqMessage);
     return { ok: false, retryable: false, error: new HttpError(502, 'ai_unreachable') };
   }
 

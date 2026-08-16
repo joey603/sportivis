@@ -67,7 +67,7 @@ GROQ_API_KEY=...
 3. En production, déclare la même variable dans **Vercel → Project Settings → Environment Variables**, ainsi que `SUPABASE_URL` et `SUPABASE_ANON_KEY` (les variables `VITE_` ne sont pas lues à l’exécution des fonctions).
 4. Exécute [`supabase/ai_features.sql`](supabase/ai_features.sql) : il crée le journal alimentaire et le compteur de quota.
 
-Par défaut, les programmes utilisent `llama-3.3-70b-versatile` et les repas `llama-3.1-8b-instant` (bien plus généreux que Gemini sur le tier gratuit). Tu peux surcharger via `GROQ_MODEL_PROGRAM` / `GROQ_MODEL_MEAL`.
+Par défaut, les programmes utilisent `openai/gpt-oss-120b` et les repas `openai/gpt-oss-20b` (remplacements Groq après le retrait des Llama 3.1 / 3.3 le 16/08/2026). Tu peux surcharger via `GROQ_MODEL_PROGRAM` / `GROQ_MODEL_MEAL` ; les anciens IDs sont automatiquement réécrits.
 
 Le quota journalier par utilisateur est appliqué dans Postgres (`consume_ai_quota`), donc il n’est pas contournable depuis le client : 10 générations de programme et 40 analyses de repas par jour. Les valeurs se changent dans la fonction `ai_quota_limit`.
 

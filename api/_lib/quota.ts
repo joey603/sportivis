@@ -50,8 +50,9 @@ export async function consumeQuota(
 }
 
 export function requireEnv(name: string, fallbackName?: string): string {
-  const value =
+  const raw =
     process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined);
+  const value = raw?.trim();
   if (!value) throw new HttpError(503, 'server_not_configured');
   return value;
 }
