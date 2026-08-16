@@ -106,10 +106,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         locale === 'he'
           ? assumeTypical
             ? 'אתה תזונאי. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים לפי מנה רגילה/טיפוסית. אל תשאל שאלות — תמיד החזר status = "ready".'
-            : 'אתה תזונאי מדויק. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים תזונתיים. כשיש אי-בהירות (כמויות חסרות, שתי חלבונים זה לצד זה, ניסוח דו-משמעי) אתה שואל שאלות קצרות עם אפשרויות במקום לנחש.'
+            : 'אתה תזונאי מדויק. אתה מפרק ארוחות לפריטים נפרדים ומעריך ערכים. כשיש אי-בהירות אתה שואל שאלות קצרות AND תמיד ממלא גם אומדן מנה רגילה ב-items כדי שהמשתמש יוכל לקבל בלי לענות.'
           : assumeTypical
             ? 'Tu es nutritionniste. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros avec des portions normales / typiques. Ne pose aucune question — renvoie toujours status = "ready".'
-            : "Tu es nutritionniste précis. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros. En cas d'ambiguïté (quantités manquantes, deux protéines côte à côte, formulation douteuse), tu poses des questions courtes à choix plutôt que de fusionner ou d'inventer.",
+            : "Tu es nutritionniste précis. Tu décomposes un repas en aliments DISTINCTS et tu estimes les macros. En cas d'ambiguïté tu poses des questions courtes ET tu fournis TOUJOURS une estimation items à portions normales, pour que l'utilisateur puisse accepter sans répondre.",
       prompt: buildPrompt(locale, description, clarifications, assumeTypical),
       schema: MEAL_SCHEMA,
       schemaName: 'meal_analysis',
@@ -124,12 +124,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           ? 'needs_clarification'
           : 'ready';
     const questions = assumeTypical ? [] : normalizeQuestions(raw.questions);
+    const meal = normalizeMeal(raw, description);
 
-    // Si le modèle demande des précisions mais n’en fournit aucune, on force ready.
+    // Précisions optionnelles : on renvoie aussi l’estimation (portions normales).
     if (status === 'needs_clarification' && questions.length > 0 && !clarifications) {
       sendJson(res, 200, {
         status: 'needs_clarification',
         questions,
+        meal: meal.items.length > 0 ? meal : undefined,
         remaining,
       });
       return;
@@ -137,7 +139,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     sendJson(res, 200, {
       status: 'ready',
-      meal: normalizeMeal(raw, description),
+      meal,
       remaining,
     });
   } catch (error) {
@@ -206,7 +208,9 @@ ${clarificationBlock}
 - חסרות כמויות לרוב הפריטים, או
 - שתי חלבונים / בשרים זה לצד זה בלי להבהיר אם הם נפרדים או מנה אחת, או
 - ניסוח דו-משמעי שיכול להתפרש כמנה מורכבת.
-אז מלא "questions" ב-1 עד 3 שאלות קצרות, כל אחת עם 2–4 "options" ברורות. השאר "items" ריק ו-"label" ריק.
+אז:
+1) מלא "questions" ב-1 עד 3 שאלות קצרות, כל אחת עם 2–4 "options" ברורות.
+2) וגם מלא "label" + "items" עם אומדן מנה רגילה/טיפוסית (המשתמש יכול לקבל בלי לענות). ב-"quantity" כתוב את ההנחה במפורש.
 אם כבר יש תשובות הבהרה למעלה, אל תשאל שוב: החזר status = "ready" עם הפירוק.
 
 כש-status = "ready":
@@ -249,7 +253,9 @@ Quand renvoyer status = "needs_clarification" :
 - quantités absentes pour la plupart des aliments, OU
 - deux protéines / viandes côte à côte sans préciser si séparées ou en un seul plat, OU
 - formulation ambiguë qui pourrait être un plat composé.
-Alors remplis "questions" avec 1 à 3 questions courtes, chacune avec 2 à 4 "options" claires. Laisse "items" vide et "label" vide.
+Alors :
+1) remplis "questions" avec 1 à 3 questions courtes, chacune avec 2 à 4 "options" claires ;
+2) ET remplis aussi "label" + "items" avec une estimation à portions normales / typiques (l'utilisateur peut accepter sans répondre). Dans "quantity", écris l'hypothèse explicitement.
 Si des réponses de clarification sont déjà fournies ci-dessus, ne re-pose pas de questions : renvoie status = "ready" avec la décomposition.
 
 Quand status = "ready" :

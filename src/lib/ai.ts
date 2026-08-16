@@ -111,6 +111,8 @@ export type AnalyzeMealResult =
   | {
       status: 'needs_clarification';
       questions: MealClarifyingQuestion[];
+      /** Estimation déjà calculée (portions normales) — l’utilisateur peut l’accepter sans répondre. */
+      meal?: AnalyzedMeal;
       remaining: number;
     };
 

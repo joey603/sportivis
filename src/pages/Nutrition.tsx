@@ -100,10 +100,23 @@ export function Nutrition() {
         options,
       );
       if (result.status === 'needs_clarification') {
-        setAnalysis(null);
-        setAiSnapshot(null);
         setQuestions(result.questions);
         setAnswers({});
+        const draft = result.meal;
+        if (draft?.items?.length) {
+          setAiSnapshot({
+            ...draft,
+            items: draft.items.map((item) => ({ ...item })),
+          });
+          setAnalysis({
+            ...draft,
+            items: draft.items.map((item) => ({ ...item })),
+          });
+          setPreviewTab('estimate');
+        } else {
+          setAnalysis(null);
+          setAiSnapshot(null);
+        }
         return;
       }
       setQuestions([]);
@@ -137,6 +150,18 @@ export function Nutrition() {
       return;
     }
     void analyze(clarifications);
+  }
+
+  /** Accepte l’estimation déjà calculée sans reposer de questions (ni 2ᵉ appel IA). */
+  function acceptTypicalEstimate() {
+    if (analysis?.items.some((item) => item.name.trim())) {
+      setQuestions([]);
+      setAnswers({});
+      setErrorCode(null);
+      setPreviewTab('estimate');
+      return;
+    }
+    void analyze(undefined, { assumeTypical: true });
   }
 
   function updateItem(index: number, patch: Partial<MealItem>) {
@@ -469,77 +494,6 @@ export function Nutrition() {
         </div>
       </section>
 
-      {questions.length > 0 && (
-        <section className="panel meal-clarify">
-          <div className="sheet-head">
-            <div>
-              <h2>{t('nutrition.clarifyTitle')}</h2>
-              <p className="muted">{t('nutrition.clarifyHint')}</p>
-            </div>
-          </div>
-
-          <div className="meal-clarify-list">
-            {questions.map((question) => (
-              <fieldset key={question.id} className="meal-clarify-question">
-                <legend>{question.prompt}</legend>
-                <div className="meal-clarify-options">
-                  {question.options.map((option) => {
-                    const selected = answers[question.id] === option;
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        className={
-                          selected
-                            ? 'btn btn-secondary btn-sm'
-                            : 'btn btn-ghost btn-sm'
-                        }
-                        onClick={() => {
-                          setAnswers((current) => ({
-                            ...current,
-                            [question.id]: option,
-                          }));
-                          setErrorCode(null);
-                        }}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            ))}
-          </div>
-
-          <div className="row-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={busy}
-              onClick={submitClarifications}
-            >
-              {busy ? t('nutrition.analyzing') : t('nutrition.clarifySubmit')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={() => void analyze(undefined, { assumeTypical: true })}
-            >
-              {busy ? t('nutrition.analyzing') : t('nutrition.clarifySkip')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={busy}
-              onClick={discardAnalysis}
-            >
-              {t('nutrition.discard')}
-            </button>
-          </div>
-        </section>
-      )}
-
       {analysis && (
         <section className="panel meal-analysis">
           <div className="sheet-head">
@@ -792,6 +746,79 @@ export function Nutrition() {
           </div>
         </section>
       )}
+
+      {questions.length > 0 && (
+        <section className="panel meal-clarify">
+          <div className="sheet-head">
+            <div>
+              <h2>{t('nutrition.clarifyTitle')}</h2>
+              <p className="muted">{t('nutrition.clarifyHint')}</p>
+            </div>
+          </div>
+
+          <div className="meal-clarify-list">
+            {questions.map((question) => (
+              <fieldset key={question.id} className="meal-clarify-question">
+                <legend>{question.prompt}</legend>
+                <div className="meal-clarify-options">
+                  {question.options.map((option) => {
+                    const selected = answers[question.id] === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        className={
+                          selected
+                            ? 'btn btn-secondary btn-sm'
+                            : 'btn btn-ghost btn-sm'
+                        }
+                        onClick={() => {
+                          setAnswers((current) => ({
+                            ...current,
+                            [question.id]: option,
+                          }));
+                          setErrorCode(null);
+                        }}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+
+          <div className="row-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={submitClarifications}
+            >
+              {busy ? t('nutrition.analyzing') : t('nutrition.clarifySubmit')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={acceptTypicalEstimate}
+            >
+              {busy ? t('nutrition.analyzing') : t('nutrition.clarifySkip')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={discardAnalysis}
+            >
+              {t('nutrition.discard')}
+            </button>
+          </div>
+        </section>
+      )}
+
+
 
       <section className="panel">
         <div className="sheet-head">
