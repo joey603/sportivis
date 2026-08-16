@@ -64,8 +64,7 @@ export function requireEnv(
 ): string {
   const raw =
     process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined);
-  // Vercel colle parfois des guillemets autour de la valeur collée.
-  const value = raw?.trim().replace(/^['"]|['"]$/g, '');
+  const value = sanitizeSecret(raw);
   if (!value) throw new HttpError(503, missingCode);
   return value;
 }
@@ -76,4 +75,16 @@ export function requireGroqApiKey(): string {
     throw new HttpError(503, 'missing_groq_key');
   }
   return key;
+}
+
+/** Nettoie une valeur collée dans Vercel (guillemets, Bearer, espaces invisibles). */
+function sanitizeSecret(raw: string | undefined): string {
+  if (!raw) return '';
+  return raw
+    .trim()
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/^['"`]|['"`]$/g, '')
+    .replace(/^Bearer\s+/i, '')
+    .trim();
 }

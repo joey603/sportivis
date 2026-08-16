@@ -189,10 +189,16 @@ async function requestOnce<T>(
     }
     if (response.status === 401) {
       console.error('[groq]', groqMessage);
+      const looksLikeBadKey = /api[_ ]?key|unauthorized|invalid|authentication/i.test(
+        groqMessage || 'api key',
+      );
       return {
         ok: false,
         retryable: false,
-        error: new HttpError(503, 'invalid_groq_key'),
+        error: new HttpError(
+          503,
+          looksLikeBadKey ? 'invalid_groq_key' : 'ai_unreachable',
+        ),
       };
     }
     if (response.status === 403) {
