@@ -2,25 +2,26 @@ import { HttpError } from './http.js';
 import { requireGroqApiKey } from './quota.js';
 
 /**
- * Client LLM via Groq (https://api.groq.com) — on n’a jamais quitté Groq.
+ * Client LLM via Groq (https://api.groq.com).
  *
- * Seuls les *modèles* changent : certains IDs Groq (Qwen preview, gpt-oss…)
- * renvoient des 401 « Invalid API Key » intermittents alors que la clé
- * fonctionne sur /models et sur d’autres modèles. On reste sur Llama production.
+ * Sur le plan gratuit, Groq renvoie parfois des 401 chat alors que la clé
+ * est valide. On reste sur les Llama production, on mémorise le dernier
+ * modèle qui a marché (instance Vercel chaude) et on évite un moment ceux
+ * qui viennent d’échouer.
  */
 const DEFAULT_MODEL_PROGRAM = 'llama-3.3-70b-versatile';
 const DEFAULT_MODEL_MEAL = 'llama-3.1-8b-instant';
-/** Secours : toujours des modèles Groq production. */
-const FALLBACK_MODELS = [
+/** Llama 8B : le plus régulier sur Groq free. Pas de gpt-oss (401 fréquents). */
+const RELIABLE_MODELS = [
   'llama-3.1-8b-instant',
   'llama-3.3-70b-versatile',
-  'openai/gpt-oss-20b',
 ] as const;
-/** Timeout d’un appel Groq : assez court pour plusieurs essais dans 1 min. */
-const ATTEMPT_TIMEOUT_MS = 18_000;
-/** On n’affiche l’échec qu’après ~1 min de retries automatiques. */
+const ATTEMPT_TIMEOUT_MS = 14_000;
 const RETRY_BUDGET_MS = 55_000;
-const PAUSE_BETWEEN_TRIES_MS = 1_200;
+const AUTH_COOLDOWN_MS = 40_000;
+const PAUSE_AFTER_AUTH_MS = 250;
+const PAUSE_AFTER_OVERLOAD_MS = 2_000;
+const PAUSE_DEFAULT_MS = 600;
 
 /** Anciens IDs / previews → modèles Groq production stables. */
 const MODEL_ALIASES: Record<string, string> = {
@@ -36,6 +37,11 @@ const MODEL_ALIASES: Record<string, string> = {
 };
 
 export type AiPurpose = 'program' | 'meal';
+
+/** Dernier modèle OK par usage — survit entre requêtes sur la même instance. */
+const lastGoodModel: Partial<Record<AiPurpose, string>> = {};
+/** Timestamp jusqu’auquel un modèle est considéré « mort » (401/403). */
+const modelCooldownUntil = new Map<string, number>();
 
 /** Sous-ensemble JSON Schema accepté par `response_format.json_schema`. */
 export type JsonSchema = {
@@ -75,7 +81,6 @@ export async function generateJson<T>(options: {
   temperature?: number;
 }): Promise<T> {
   const apiKey = requireGroqApiKey();
-  const models = modelCandidates(options.purpose);
   // Les modèles Groq en mode `json_object` exigent le mot « JSON » dans le prompt.
   const system = `${options.systemInstruction}\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans texte autour, respectant exactement cette forme :\n${describeSchema(options.schema)}`;
 
@@ -84,6 +89,8 @@ export async function generateJson<T>(options: {
   let tryIndex = 0;
 
   while (Date.now() - started < RETRY_BUDGET_MS) {
+    const models = modelCandidates(options.purpose);
+    if (!models.length) break;
     const model = models[tryIndex % models.length];
     const remaining = RETRY_BUDGET_MS - (Date.now() - started);
     if (remaining < 2_000) break;
@@ -101,6 +108,8 @@ export async function generateJson<T>(options: {
       Math.min(ATTEMPT_TIMEOUT_MS, remaining - 500),
     );
     if (result.ok) {
+      lastGoodModel[options.purpose] = model;
+      modelCooldownUntil.delete(model);
       if (tryIndex > 0) {
         console.info(`[groq] ok via ${model} after ${tryIndex + 1} tries`);
       }
@@ -109,25 +118,47 @@ export async function generateJson<T>(options: {
     lastError = result.error;
     if (!result.retryable && !result.tryNextModel) throw result.error;
 
+    if (result.kind === 'auth') {
+      modelCooldownUntil.set(model, Date.now() + AUTH_COOLDOWN_MS);
+    }
+
     tryIndex += 1;
-    const pause = Math.min(PAUSE_BETWEEN_TRIES_MS, RETRY_BUDGET_MS - (Date.now() - started));
-    if (pause > 0) await delay(pause);
+    const pause =
+      result.kind === 'auth'
+        ? PAUSE_AFTER_AUTH_MS
+        : result.kind === 'overload'
+          ? PAUSE_AFTER_OVERLOAD_MS
+          : PAUSE_DEFAULT_MS;
+    const wait = Math.min(pause, RETRY_BUDGET_MS - (Date.now() - started));
+    if (wait > 0) await delay(wait);
   }
 
   throw lastError ?? new HttpError(503, 'ai_overloaded');
 }
 
 function modelCandidates(purpose: AiPurpose): string[] {
+  const preferred = lastGoodModel[purpose];
   const primary = resolveModel(purpose);
-  const ordered = [primary, ...FALLBACK_MODELS];
+  const now = Date.now();
+  const ordered = [
+    preferred,
+    purpose === 'meal' ? DEFAULT_MODEL_MEAL : DEFAULT_MODEL_PROGRAM,
+    ...RELIABLE_MODELS,
+    primary,
+  ].filter((model): model is string => Boolean(model));
+
   const seen = new Set<string>();
-  const unique: string[] = [];
+  const ready: string[] = [];
+  const cooling: string[] = [];
   for (const model of ordered) {
     if (seen.has(model)) continue;
     seen.add(model);
-    unique.push(model);
+    const until = modelCooldownUntil.get(model) ?? 0;
+    if (until > now) cooling.push(model);
+    else ready.push(model);
   }
-  return unique;
+  // Si tous sont en cooldown, on les réessaie quand même (401 souvent bref).
+  return ready.length ? ready.concat(cooling) : cooling;
 }
 
 function buildRequestBody(
@@ -181,12 +212,15 @@ function describeSchema(schema: JsonSchema): string {
   }
 }
 
+type RequestKind = 'auth' | 'overload' | 'other';
+
 type RequestResult<T> =
   | { ok: true; value: T }
   | {
       ok: false;
       retryable: boolean;
       tryNextModel?: boolean;
+      kind?: RequestKind;
       error: HttpError;
     };
 
@@ -212,9 +246,9 @@ async function requestOnce<T>(
     });
   } catch (reason) {
     if (reason instanceof Error && reason.name === 'AbortError') {
-      return { ok: false, retryable: true, error: new HttpError(504, 'ai_timeout') };
+      return { ok: false, retryable: true, kind: 'other', error: new HttpError(504, 'ai_timeout') };
     }
-    return { ok: false, retryable: true, error: new HttpError(502, 'ai_unreachable') };
+    return { ok: false, retryable: true, kind: 'other', error: new HttpError(502, 'ai_unreachable') };
   } finally {
     clearTimeout(timer);
   }
@@ -234,6 +268,7 @@ async function requestOnce<T>(
       return {
         ok: false,
         retryable: true,
+        kind: 'overload',
         error: new HttpError(response.status === 413 ? 429 : response.status, 'ai_overloaded'),
       };
     }
@@ -243,6 +278,8 @@ async function requestOnce<T>(
       return {
         ok: false,
         retryable: true,
+        tryNextModel: true,
+        kind: 'auth',
         error: new HttpError(503, 'ai_unreachable'),
       };
     }
@@ -255,6 +292,7 @@ async function requestOnce<T>(
         ok: false,
         retryable: false,
         tryNextModel: true,
+        kind: 'other',
         error: new HttpError(502, 'ai_unreachable'),
       };
     }
@@ -271,6 +309,7 @@ async function requestOnce<T>(
       ok: false,
       retryable: true,
       tryNextModel: true,
+      kind: 'other',
       error: new HttpError(502, 'ai_unreachable'),
     };
   }
@@ -281,6 +320,7 @@ async function requestOnce<T>(
       ok: false,
       retryable: true,
       tryNextModel: true,
+      kind: 'other',
       error: new HttpError(502, 'ai_empty'),
     };
   }
@@ -292,6 +332,7 @@ async function requestOnce<T>(
       ok: false,
       retryable: true,
       tryNextModel: true,
+      kind: 'other',
       error: new HttpError(502, 'ai_invalid_json'),
     };
   }
