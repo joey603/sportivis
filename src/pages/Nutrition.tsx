@@ -86,7 +86,10 @@ export function Nutrition() {
     minute: '2-digit',
   });
 
-  async function analyze(clarifications?: MealClarificationAnswer[]) {
+  async function analyze(
+    clarifications?: MealClarificationAnswer[],
+    options?: { assumeTypical?: boolean },
+  ) {
     setBusy(true);
     setErrorCode(null);
     try {
@@ -94,6 +97,7 @@ export function Nutrition() {
         description.trim(),
         locale,
         clarifications,
+        options,
       );
       if (result.status === 'needs_clarification') {
         setAnalysis(null);
@@ -515,6 +519,14 @@ export function Nutrition() {
               onClick={submitClarifications}
             >
               {busy ? t('nutrition.analyzing') : t('nutrition.clarifySubmit')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={busy}
+              onClick={() => void analyze(undefined, { assumeTypical: true })}
+            >
+              {busy ? t('nutrition.analyzing') : t('nutrition.clarifySkip')}
             </button>
             <button
               type="button"
