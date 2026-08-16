@@ -1,4 +1,4 @@
-import { EXERCISES } from '../data/exercises';
+import { EXERCISES } from '../data/exercises.js';
 import type {
   Equipment,
   Exercise,

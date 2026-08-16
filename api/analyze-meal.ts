@@ -3,7 +3,7 @@ import {
   assertLlmConfigured,
   generateJson,
   type JsonSchema,
-} from './_lib/llm';
+} from './_lib/llm.js';
 import {
   asRecord,
   bearerToken,
@@ -15,8 +15,8 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from './_lib/http';
-import { consumeQuota } from './_lib/quota';
+} from './_lib/http.js';
+import { consumeQuota } from './_lib/quota.js';
 
 export const config = { maxDuration: 30 };
 

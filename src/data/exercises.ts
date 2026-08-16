@@ -1,5 +1,5 @@
 import type { Exercise } from '../types';
-import { EXERCISES_EXTRA } from './exercisesExtra';
+import { EXERCISES_EXTRA } from './exercisesExtra.js';
 
 const BASE_EXERCISES: Exercise[] = [
   // —— Pectoraux ——

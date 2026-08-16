@@ -1,15 +1,15 @@
-import { EXERCISES } from '../src/data/exercises';
+import { EXERCISES } from '../src/data/exercises.js';
 import type { Locale } from '../src/i18n/messages';
 import {
   buildExerciseCatalog,
   buildFormatInstructions,
-} from '../src/lib/programPrompt';
+} from '../src/lib/programPrompt.js';
 import type { Exercise } from '../src/types';
 import {
   assertLlmConfigured,
   generateJson,
   type JsonSchema,
-} from './_lib/llm';
+} from './_lib/llm.js';
 import {
   asRecord,
   bearerToken,
@@ -21,8 +21,8 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from './_lib/http';
-import { consumeQuota } from './_lib/quota';
+} from './_lib/http.js';
+import { consumeQuota } from './_lib/quota.js';
 
 export const config = { maxDuration: 30 };
 

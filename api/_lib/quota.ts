@@ -1,4 +1,4 @@
-import { HttpError } from './http';
+import { HttpError } from './http.js';
 
 /**
  * Le plafond journalier vit dans Postgres (fonction `consume_ai_quota`) : le

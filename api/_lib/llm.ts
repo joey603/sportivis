@@ -1,5 +1,5 @@
-import { HttpError } from './http';
-import { requireEnv } from './quota';
+import { HttpError } from './http.js';
+import { requireEnv } from './quota.js';
 
 /**
  * Client LLM via Groq (API compatible OpenAI). Le tier gratuit offre bien plus

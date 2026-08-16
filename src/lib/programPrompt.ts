@@ -2,7 +2,7 @@ import {
   localizeEquipment,
   localizeExerciseName,
   localizeMuscle,
-} from '../i18n/exercises';
+} from '../i18n/exercises.js';
 import type { Locale } from '../i18n/messages';
 import type { Exercise } from '../types';
 
