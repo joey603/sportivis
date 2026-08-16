@@ -171,15 +171,17 @@ async function probeGroqChat(
 function resolveConfiguredModel(purpose: 'meal' | 'program'): string {
   const defaults = {
     meal: 'openai/gpt-oss-20b',
-    program: 'qwen/qwen3.6-27b',
+    program: 'llama-3.3-70b-versatile',
   } as const;
   const aliases: Record<string, string> = {
-    'llama-3.1-8b-instant': defaults.meal,
+    'llama-3.1-8b-instant': 'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile': defaults.program,
     'llama-3.1-70b-versatile': defaults.program,
     'llama3-70b-8192': defaults.program,
-    'llama3-8b-8192': defaults.meal,
-    'openai/gpt-oss-120b': defaults.program,
+    'llama3-8b-8192': 'llama-3.1-8b-instant',
+    'openai/gpt-oss-120b': defaults.meal,
+    'qwen/qwen3.6-27b': defaults.program,
+    'qwen/qwen3-32b': defaults.program,
   };
   const configured =
     purpose === 'meal'
