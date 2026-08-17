@@ -214,7 +214,7 @@ export function Programs() {
             {exerciseCountLabel(p.exercises.length)}
             {p.description ? ` · ${p.description}` : ''}
           </p>
-          <div className="row-actions" style={{ marginTop: '0.85rem' }}>
+          <div className="row-actions program-card-actions">
             <Link to={`/seance/${p.id}`} className="btn btn-primary btn-sm">
               {t('common.launch')}
             </Link>
