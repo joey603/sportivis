@@ -1,4 +1,12 @@
-import type { Equipment, Exercise, MuscleGroup, Session, SetLog } from '../types';
+import type {
+  Equipment,
+  Exercise,
+  MuscleGroup,
+  ProgramExercise,
+  Session,
+  SetLog,
+  SportIntensity,
+} from '../types';
 import { getExerciseById, sessionDurationMin } from './storage';
 
 const DEFAULT_BODY_WEIGHT_KG = 75;
@@ -46,9 +54,25 @@ export function clearSettings(): void {
   localStorage.removeItem(SETTINGS_KEY);
 }
 
+export const SPORT_INTENSITIES: readonly SportIntensity[] = [
+  'faible',
+  'moderee',
+  'elevee',
+] as const;
+
+/** Écart de dépense entre un match tranquille et un rythme soutenu. */
+const SPORT_INTENSITY_FACTOR: Record<SportIntensity, number> = {
+  faible: 0.75,
+  moderee: 1,
+  elevee: 1.3,
+};
+
 /** MET approximatif selon le type d’exercice (références ACSM / Compendium). */
 export function exerciseMet(exercise: Exercise | undefined): number {
   if (!exercise) return 4.5;
+
+  // Les sports portent leur propre MET : le matériel ne dit rien de l'effort.
+  if (exercise.met && exercise.met > 0) return exercise.met;
 
   if (exercise.equipment === 'cardio' || exercise.muscle === 'cardio') {
     return 7.5;
@@ -121,6 +145,7 @@ function intensityFactor(
   bodyWeightKg: number,
   exercise: Exercise | undefined,
 ): number {
+  if (set.intensity) return SPORT_INTENSITY_FACTOR[set.intensity];
   if (!set.weightKg || set.weightKg <= 0 || !exercise || exercise.tracking !== 'reps') {
     return 1;
   }
@@ -146,6 +171,31 @@ export function setCaloriesKcal(
     weight *
     (seconds / 3600);
   return Math.max(0, Math.round(kcal * 10) / 10);
+}
+
+/**
+ * Estimation des calories d'un exercice tel que planifié, avant la séance.
+ * Sert de repère dans l'éditeur de programme.
+ */
+export function programExerciseCaloriesKcal(
+  pe: ProgramExercise,
+  exercise: Exercise | undefined,
+  bodyWeightKg = loadSettings().bodyWeightKg,
+): number {
+  const perSet = setCaloriesKcal(
+    {
+      setIndex: 0,
+      completed: true,
+      reps: pe.reps,
+      weightKg: pe.targetWeightKg,
+      durationSec: pe.durationSec ?? pe.workDurationSec,
+      distanceM: pe.distanceM,
+      intensity: pe.intensity,
+    },
+    exercise,
+    bodyWeightKg,
+  );
+  return Math.round(perSet * Math.max(1, pe.sets));
 }
 
 /**

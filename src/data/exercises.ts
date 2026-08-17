@@ -1,5 +1,6 @@
 import type { Exercise } from '../types';
 import { EXERCISES_EXTRA } from './exercisesExtra.js';
+import { SPORT_EXERCISES } from './exercisesSports.js';
 
 const BASE_EXERCISES: Exercise[] = [
   // —— Pectoraux ——
@@ -156,7 +157,19 @@ const BASE_EXERCISES: Exercise[] = [
   { id: 'battle-ropes', name: 'Battle ropes', muscle: 'full_body', equipment: 'autre', tracking: 'duration', defaultRestSec: 45 },
 ];
 
-export const EXERCISES: Exercise[] = [...BASE_EXERCISES, ...EXERCISES_EXTRA];
+export const EXERCISES: Exercise[] = [
+  ...BASE_EXERCISES,
+  ...SPORT_EXERCISES,
+  ...EXERCISES_EXTRA,
+];
+
+/**
+ * Les sports se distinguent des exercices de salle : durée + intensité au lieu
+ * de séries et charges.
+ */
+export function isSportExercise(exercise: Exercise | undefined): boolean {
+  return exercise?.equipment === 'sport';
+}
 
 export const MUSCLE_GROUPS = [
   'pectoraux',
@@ -170,6 +183,7 @@ export const MUSCLE_GROUPS = [
   'mollets',
   'core',
   'cardio',
+  'sport',
   'full_body',
 ] as const;
 
@@ -181,6 +195,7 @@ export const EQUIPMENT_TYPES = [
   'poids_du_corps',
   'cardio',
   'kettlebell',
+  'sport',
   'autre',
 ] as const;
 

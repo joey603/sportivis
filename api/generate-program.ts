@@ -221,6 +221,7 @@ const EQUIPMENT_VALUES = [
   'poids_du_corps',
   'cardio',
   'kettlebell',
+  'sport',
   'autre',
 ];
 

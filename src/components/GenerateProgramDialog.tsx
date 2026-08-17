@@ -50,7 +50,11 @@ export function GenerateProgramDialog({
       : 3;
   });
   const [sessionMinutes, setSessionMinutes] = useState(60);
-  const [equipment, setEquipment] = useState<string[]>([]);
+  // Tout le matériel de salle est coché d'office ; les sports restent à cocher
+  // à la main car ils dépendent d'un terrain et d'un créneau.
+  const [equipment, setEquipment] = useState<string[]>(() =>
+    EQUIPMENT_TYPES.filter((value) => value !== 'sport'),
+  );
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);

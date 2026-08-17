@@ -5,7 +5,13 @@ import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
 import { GenerateProgramDialog } from '../components/GenerateProgramDialog';
 import { ImportProgram } from '../components/ImportProgram';
+import { isSportExercise } from '../data/exercises';
 import { useI18n } from '../i18n/I18nContext';
+import {
+  loadSettings,
+  programExerciseCaloriesKcal,
+  SPORT_INTENSITIES,
+} from '../lib/calories';
 import type { ImportedProgram } from '../lib/programExchange';
 import {
   createId,
@@ -16,11 +22,22 @@ import {
   loadData,
   upsertProgram,
 } from '../lib/storage';
-import type { Exercise, Program, ProgramExercise } from '../types';
+import type {
+  Exercise,
+  Program,
+  ProgramExercise,
+  SportIntensity,
+} from '../types';
 
 const WORK_TIME_OPTIONS = [
   0, 15, 20, 30, 40, 45, 60, 75, 90, 120, 150, 180, 240, 300,
 ];
+
+const INTENSITY_LABELS: Record<SportIntensity, string> = {
+  faible: 'Faible',
+  moderee: 'Modérée',
+  elevee: 'Élevée',
+};
 
 export function ProgramEditor() {
   const { t } = useI18n();
@@ -46,6 +63,7 @@ export function ProgramEditor() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const bodyWeightKg = loadSettings().bodyWeightKg;
 
   if (!program) {
     return (
@@ -96,17 +114,27 @@ export function ProgramEditor() {
   }
 
   function addExercise(ex: Exercise) {
-    const pe: ProgramExercise = {
-      id: createId(),
-      exerciseId: ex.id,
-      sets: 3,
-      restSec: ex.defaultRestSec,
-      ...(ex.tracking === 'reps'
-        ? { reps: 10 }
-        : ex.tracking === 'duration'
-          ? { durationSec: 60 }
-          : { distanceM: 100 }),
-    };
+    // Un sport se pratique d'un bloc : une « série » de 45 min à intensité modérée.
+    const pe: ProgramExercise = isSportExercise(ex)
+      ? {
+          id: createId(),
+          exerciseId: ex.id,
+          sets: 1,
+          restSec: 0,
+          durationSec: 45 * 60,
+          intensity: 'moderee',
+        }
+      : {
+          id: createId(),
+          exerciseId: ex.id,
+          sets: 3,
+          restSec: ex.defaultRestSec,
+          ...(ex.tracking === 'reps'
+            ? { reps: 10 }
+            : ex.tracking === 'duration'
+              ? { durationSec: 60 }
+              : { distanceM: 100 }),
+        };
     setProgram((p) =>
       p ? { ...p, exercises: [...p.exercises, pe] } : p,
     );
@@ -203,6 +231,10 @@ export function ProgramEditor() {
         {program.exercises.map((pe, index) => {
           const ex = getExerciseById(pe.exerciseId);
           const workSec = exerciseWorkSeconds(pe);
+          const sport = isSportExercise(ex);
+          const sportKcal = sport
+            ? programExerciseCaloriesKcal(pe, ex, bodyWeightKg)
+            : 0;
           return (
             <div key={pe.id} className="panel editor-ex">
               <div className="editor-ex-head">
@@ -221,9 +253,23 @@ export function ProgramEditor() {
                   <div className="editor-ex-copy">
                     <strong>{ex?.name ?? pe.exerciseId}</strong>
                     <div className="muted editor-ex-meta">
-                      {ex?.muscle} · {ex?.equipment.replace(/_/g, ' ')} · cible{' '}
-                      {formatExerciseTarget(pe.exerciseId, pe)}
-                      {workSec !== null && ` · effort ${formatSeconds(workSec)}`}
+                      {sport ? (
+                        <>
+                          sport · {formatExerciseTarget(pe.exerciseId, pe)} ·{' '}
+                          intensité{' '}
+                          {INTENSITY_LABELS[
+                            pe.intensity ?? 'moderee'
+                          ].toLowerCase()}{' '}
+                          · ≈ {sportKcal} kcal
+                        </>
+                      ) : (
+                        <>
+                          {ex?.muscle} · {ex?.equipment.replace(/_/g, ' ')} ·
+                          cible {formatExerciseTarget(pe.exerciseId, pe)}
+                          {workSec !== null &&
+                            ` · effort ${formatSeconds(workSec)}`}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -254,18 +300,63 @@ export function ProgramEditor() {
                 </div>
               </div>
               <div className="editor-fields">
-                <div className="field">
-                  <label>Séries</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={pe.sets}
-                    onChange={(e) =>
-                      updateExercise(pe.id, { sets: Number(e.target.value) || 1 })
-                    }
-                  />
-                </div>
-                {ex?.tracking === 'reps' && (
+                {sport && (
+                  <>
+                    <div className="field">
+                      <label>Durée (min)</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={300}
+                        step={5}
+                        value={Math.round((pe.durationSec ?? 0) / 60) || ''}
+                        onChange={(e) =>
+                          updateExercise(pe.id, {
+                            durationSec:
+                              (Number(e.target.value) || 0) * 60 || undefined,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label>Intensité</label>
+                      <select
+                        value={pe.intensity ?? 'moderee'}
+                        onChange={(e) =>
+                          updateExercise(pe.id, {
+                            intensity: e.target.value as SportIntensity,
+                          })
+                        }
+                      >
+                        {SPORT_INTENSITIES.map((value) => (
+                          <option key={value} value={value}>
+                            {INTENSITY_LABELS[value]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>Calories estimées</label>
+                      <output className="editor-kcal">≈ {sportKcal} kcal</output>
+                    </div>
+                  </>
+                )}
+                {!sport && (
+                  <div className="field">
+                    <label>Séries</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={pe.sets}
+                      onChange={(e) =>
+                        updateExercise(pe.id, {
+                          sets: Number(e.target.value) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {!sport && ex?.tracking === 'reps' && (
                   <div className="field">
                     <label>Reps</label>
                     <input
@@ -280,7 +371,7 @@ export function ProgramEditor() {
                     />
                   </div>
                 )}
-                {ex?.tracking === 'duration' && (
+                {!sport && ex?.tracking === 'duration' && (
                   <div className="field">
                     <label>Durée (s)</label>
                     <input
@@ -295,7 +386,7 @@ export function ProgramEditor() {
                     />
                   </div>
                 )}
-                {ex?.tracking !== 'duration' && (
+                {!sport && ex?.tracking !== 'duration' && (
                   <div className="field">
                     <label>Temps d’effort (s)</label>
                     <select
@@ -314,7 +405,7 @@ export function ProgramEditor() {
                     </select>
                   </div>
                 )}
-                {ex?.tracking === 'distance' && (
+                {!sport && ex?.tracking === 'distance' && (
                   <div className="field">
                     <label>Distance (m)</label>
                     <input
@@ -329,20 +420,22 @@ export function ProgramEditor() {
                     />
                   </div>
                 )}
-                <div className="field">
-                  <label>Repos (s)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={pe.restSec}
-                    onChange={(e) =>
-                      updateExercise(pe.id, {
-                        restSec: Number(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </div>
-                {ex?.tracking === 'reps' && (
+                {!sport && (
+                  <div className="field">
+                    <label>Repos (s)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={pe.restSec}
+                      onChange={(e) =>
+                        updateExercise(pe.id, {
+                          restSec: Number(e.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {!sport && ex?.tracking === 'reps' && (
                   <div className="field">
                     <label>Charge cible (kg)</label>
                     <input

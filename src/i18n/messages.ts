@@ -239,6 +239,7 @@ const fr = {
   'dashboard.globalGoal': 'Objectif global',
   'dashboard.globalGoalUnset': 'À définir',
   'dashboard.managePrograms': 'Gérer mes programmes',
+  'dashboard.manageNutrition': 'Alimentation',
   'dashboard.welcome': 'Bon entraînement',
   'dashboard.week': 'Cette semaine',
   'dashboard.sessions': 'Séances',
@@ -258,6 +259,8 @@ const fr = {
   'dashboard.totalVolumeHint': 'kg soulevés',
   'dashboard.calories': 'Calories',
   'dashboard.caloriesHint': 'kcal cette semaine',
+  'dashboard.burned': 'Calories brûlées',
+  'dashboard.burnedHint': 'kcal estimées',
   'dashboard.intake': 'Objectif du jour',
   'dashboard.intakeHint': 'kcal sur {goal} visées',
   'dashboard.intakeProgress': '{consumed} sur {goal}',
@@ -271,6 +274,25 @@ const fr = {
   'dashboard.activityChart': 'Séances des sept derniers jours',
   'dashboard.daySessions': '{count} séance',
   'dashboard.daySessions_plural': '{count} séances',
+  'dashboard.periodStats': 'Statistiques par période',
+  'dashboard.period.day': 'Jour',
+  'dashboard.period.week': 'Semaine',
+  'dashboard.period.month': 'Mois',
+  'dashboard.periodTitle.day': 'Aujourd’hui',
+  'dashboard.periodTitle.week': 'Cette semaine',
+  'dashboard.periodTitle.month': '30 derniers jours',
+  'dashboard.periodIntake.day': 'Objectif du jour',
+  'dashboard.periodIntake.week': 'Objectif de la semaine',
+  'dashboard.periodIntake.month': 'Objectif du mois',
+  'dashboard.nutritionTrend': 'Nutrition',
+  'dashboard.nutritionTrendHint': 'Calories et protéines des {count} derniers jours',
+  'dashboard.nutritionTrendChart':
+    'Calories et protéines des {count} derniers jours, en part de la cible',
+  'dashboard.nutritionTrendEmpty':
+    'Ajoute un repas dans Nutrition pour voir la courbe.',
+  'dashboard.nutritionTrendTarget': 'Cible',
+  'dashboard.nutritionTrendAverage':
+    'Moyenne par jour suivi : {kcal} kcal · {protein} g de protéines',
 
   'units.min': 'min',
   'units.kcal': 'kcal',
@@ -301,7 +323,8 @@ const fr = {
   'ai.sessions': 'Séances par semaine',
   'ai.duration': 'Durée de séance (min)',
   'ai.equipment': 'Matériel disponible',
-  'ai.equipmentHint': 'Sans sélection, tout le matériel est autorisé.',
+  'ai.equipmentHint':
+    'Tout est coché sauf les sports, qui demandent un terrain : décoche ce que tu n’as pas.',
   'ai.notes': 'Demandes et contraintes (optionnel)',
   'ai.notesPlaceholder':
     'Ex. fais-moi une séance uniquement cardio, évite les sauts, épaule droite sensible…',
@@ -384,6 +407,12 @@ const fr = {
   'nutrition.proteinExceeded': 'Protéines dépassées de {count} g.',
   'nutrition.proteinReached': 'Objectif protéines atteint.',
   'nutrition.proteinProgress': '{consumed} sur {goal} g',
+  'nutrition.addProtein': 'Ajouter protéines',
+  'nutrition.addProteinAmount': 'Grammes de protéines',
+  'nutrition.addProteinPlaceholder': 'Ex. 25',
+  'nutrition.addProteinConfirm': 'Ajouter',
+  'nutrition.addProteinInvalid': 'Indique une quantité entre 1 et 200 g.',
+  'nutrition.manualProteinLabel': 'Protéines (manuel)',
   'nutrition.profileIncomplete':
     'Complète ton profil (âge, sexe, taille, objectif et séances) pour calculer l’objectif.',
   'nutrition.completeProfile': 'Compléter dans Compte',
@@ -406,6 +435,15 @@ const fr = {
   'nutrition.tabRefine': 'Préciser',
   'nutrition.tabEstimateHint':
     'Portions moyennes estimées par l’IA. Passe sur Préciser pour ajuster.',
+  'nutrition.history': 'Historique',
+  'nutrition.historyTitle': 'Historique des repas',
+  'nutrition.historyLead':
+    'Tous les jours où tu as enregistré un repas, mois par mois.',
+  'nutrition.historyEmpty': 'Aucun repas enregistré pour l’instant.',
+  'nutrition.historyMonthTotal': '{days} j · {kcal} kcal · {protein} g',
+  'nutrition.historyDayTotal': 'Total : {kcal} kcal · {protein} g protéines',
+  'nutrition.historyDayTotalGoal':
+    'Total : {kcal} / {kcalGoal} kcal · {protein} / {proteinGoal} g protéines',
 
   'units.g': 'g',
 } as const;
@@ -645,6 +683,7 @@ const he: Record<MessageKey, string> = {
   'dashboard.globalGoal': 'מטרה כללית',
   'dashboard.globalGoalUnset': 'טרם הוגדרה',
   'dashboard.managePrograms': 'ניהול התוכניות',
+  'dashboard.manageNutrition': 'תזונה',
   'dashboard.welcome': 'אימון מוצלח',
   'dashboard.week': 'השבוע',
   'dashboard.sessions': 'אימונים',
@@ -663,6 +702,8 @@ const he: Record<MessageKey, string> = {
   'dashboard.totalVolumeHint': 'ק״ג שהורמו',
   'dashboard.calories': 'קלוריות',
   'dashboard.caloriesHint': 'קלוריות השבוע',
+  'dashboard.burned': 'קלוריות שנשרפו',
+  'dashboard.burnedHint': 'קלוריות משוערות',
   'dashboard.intake': 'יעד יומי',
   'dashboard.intakeHint': 'קלוריות מתוך {goal}',
   'dashboard.intakeProgress': '{consumed} מתוך {goal}',
@@ -676,6 +717,24 @@ const he: Record<MessageKey, string> = {
   'dashboard.activityChart': 'אימונים בשבעת הימים האחרונים',
   'dashboard.daySessions': 'אימון אחד',
   'dashboard.daySessions_plural': '{count} אימונים',
+  'dashboard.periodStats': 'נתונים לפי תקופה',
+  'dashboard.period.day': 'יום',
+  'dashboard.period.week': 'שבוע',
+  'dashboard.period.month': 'חודש',
+  'dashboard.periodTitle.day': 'היום',
+  'dashboard.periodTitle.week': 'השבוע',
+  'dashboard.periodTitle.month': '30 הימים האחרונים',
+  'dashboard.periodIntake.day': 'יעד יומי',
+  'dashboard.periodIntake.week': 'יעד שבועי',
+  'dashboard.periodIntake.month': 'יעד חודשי',
+  'dashboard.nutritionTrend': 'תזונה',
+  'dashboard.nutritionTrendHint': 'קלוריות וחלבון ב-{count} הימים האחרונים',
+  'dashboard.nutritionTrendChart':
+    'קלוריות וחלבון ב-{count} הימים האחרונים, כאחוז מהיעד',
+  'dashboard.nutritionTrendEmpty': 'הוסף ארוחה בעמוד תזונה כדי לראות את הגרף.',
+  'dashboard.nutritionTrendTarget': 'יעד',
+  'dashboard.nutritionTrendAverage':
+    'ממוצע ליום עם מעקב: {kcal} קלוריות · {protein} ג׳ חלבון',
 
   'units.min': 'דק׳',
   'units.kcal': 'קלוריות',
@@ -706,7 +765,8 @@ const he: Record<MessageKey, string> = {
   'ai.sessions': 'אימונים בשבוע',
   'ai.duration': 'משך האימון (דקות)',
   'ai.equipment': 'ציוד זמין',
-  'ai.equipmentHint': 'בלי בחירה, כל הציוד מותר.',
+  'ai.equipmentHint':
+    'הכול מסומן חוץ מספורט, שדורש מתקן: בטל סימון של מה שאין לך.',
   'ai.notes': 'בקשות ומגבלות (לא חובה)',
   'ai.notesPlaceholder':
     'לדוגמה: אימון קרדיו בלבד, בלי קפיצות, כתף ימין רגישה…',
@@ -788,6 +848,12 @@ const he: Record<MessageKey, string> = {
   'nutrition.proteinExceeded': 'חרגת מהחלבון ב-{count} ג׳.',
   'nutrition.proteinReached': 'יעד החלבון הושג.',
   'nutrition.proteinProgress': '{consumed} מתוך {goal} ג׳',
+  'nutrition.addProtein': 'הוספת חלבון',
+  'nutrition.addProteinAmount': 'גרם חלבון',
+  'nutrition.addProteinPlaceholder': 'לדוגמה 25',
+  'nutrition.addProteinConfirm': 'הוספה',
+  'nutrition.addProteinInvalid': 'הזן כמות בין 1 ל-200 ג׳.',
+  'nutrition.manualProteinLabel': 'חלבון (ידני)',
   'nutrition.profileIncomplete':
     'השלם את הפרופיל (גיל, מין, גובה, מטרה ואימונים) כדי לחשב את היעד.',
   'nutrition.completeProfile': 'השלמה בחשבון',
@@ -809,6 +875,14 @@ const he: Record<MessageKey, string> = {
   'nutrition.tabRefine': 'דיוק',
   'nutrition.tabEstimateHint':
     'מנות ממוצעות לפי הערכת ה-AI. עבור לדיוק כדי להתאים.',
+  'nutrition.history': 'היסטוריה',
+  'nutrition.historyTitle': 'היסטוריית הארוחות',
+  'nutrition.historyLead': 'כל הימים שבהם רשמת ארוחה, לפי חודשים.',
+  'nutrition.historyEmpty': 'עדיין לא נרשמו ארוחות.',
+  'nutrition.historyMonthTotal': '{days} ימים · {kcal} קלוריות · {protein} ג׳',
+  'nutrition.historyDayTotal': 'סה״כ: {kcal} קלוריות · {protein} ג׳ חלבון',
+  'nutrition.historyDayTotalGoal':
+    'סה״כ: {kcal} / {kcalGoal} קלוריות · {protein} / {proteinGoal} ג׳ חלבון',
 
   'units.g': 'גרם',
 };

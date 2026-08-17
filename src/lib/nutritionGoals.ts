@@ -161,12 +161,28 @@ export function resolveDailyTargets(
   return inputs ? computeDailyTargets(inputs) : null;
 }
 
-export function sumDayMacros(meals: Meal[]): {
+export type MacroTotals = {
   kcal: number;
   proteinG: number;
   carbsG: number;
   fatG: number;
-} {
+};
+
+export type DayMacros = {
+  key: string;
+  date: Date;
+  meals: Meal[];
+  totals: MacroTotals;
+};
+
+export type MonthMacros = {
+  key: string;
+  date: Date;
+  days: DayMacros[];
+  totals: MacroTotals;
+};
+
+export function sumDayMacros(meals: Meal[]): MacroTotals {
   return meals.reduce(
     (sum, meal) => ({
       kcal: sum.kcal + meal.kcal,
@@ -193,9 +209,151 @@ export function compareDayIntake(
   meals: Meal[],
   targets: DailyTargets,
 ): DayComparison {
-  const actual = sumDayMacros(meals);
+  return compareIntake(sumDayMacros(meals), targets);
+}
+
+/** Même comparaison que pour un jour, mais sur des totaux déjà cumulés. */
+export function compareIntake(
+  totals: Pick<MacroTotals, 'kcal' | 'proteinG'>,
+  targets: DailyTargets,
+): DayComparison {
   return {
-    kcal: progress(actual.kcal, targets.kcal),
-    protein: progress(actual.proteinG, targets.proteinG),
+    kcal: progress(totals.kcal, targets.kcal),
+    protein: progress(totals.proteinG, targets.proteinG),
   };
+}
+
+/** Cibles cumulées sur plusieurs jours (semaine, mois…). */
+export function scaleTargets(
+  targets: DailyTargets,
+  days: number,
+): DailyTargets {
+  return {
+    kcal: targets.kcal * days,
+    proteinG: targets.proteinG * days,
+  };
+}
+
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function monthKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}`;
+}
+
+function addTotals(base: MacroTotals, add: MacroTotals): MacroTotals {
+  return {
+    kcal: base.kcal + add.kcal,
+    proteinG: base.proteinG + add.proteinG,
+    carbsG: base.carbsG + add.carbsG,
+    fatG: base.fatG + add.fatG,
+  };
+}
+
+/**
+ * Fenêtre glissante de `days` jours civils terminant aujourd'hui, du plus
+ * ancien au plus récent. Les jours sans repas restent présents à zéro pour que
+ * les graphes gardent un pas régulier.
+ */
+export function dailyMacroSeries(
+  meals: Meal[],
+  days: number,
+  end = new Date(),
+): DayMacros[] {
+  const last = new Date(end);
+  last.setHours(0, 0, 0, 0);
+  const series = Array.from({ length: days }, (_, index) => {
+    const date = new Date(last);
+    date.setDate(last.getDate() - (days - 1 - index));
+    return {
+      key: dayKey(date),
+      date,
+      meals: [] as Meal[],
+      totals: { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+    };
+  });
+  const byKey = new Map(series.map((day) => [day.key, day]));
+
+  for (const meal of meals) {
+    const day = byKey.get(dayKey(new Date(meal.eatenAt)));
+    if (!day) continue;
+    day.meals.push(meal);
+    day.totals = addTotals(day.totals, {
+      kcal: meal.kcal,
+      proteinG: meal.proteinG,
+      carbsG: meal.carbsG,
+      fatG: meal.fatG,
+    });
+  }
+
+  for (const day of series) {
+    day.meals.sort(
+      (a, b) => new Date(b.eatenAt).getTime() - new Date(a.eatenAt).getTime(),
+    );
+  }
+  return series;
+}
+
+/**
+ * Historique complet regroupé par mois puis par jour, du plus récent au plus
+ * ancien. Seuls les jours comportant au moins un repas apparaissent.
+ */
+export function groupMealsByMonth(meals: Meal[]): MonthMacros[] {
+  const months = new Map<string, MonthMacros>();
+
+  for (const meal of meals) {
+    const eatenAt = new Date(meal.eatenAt);
+    if (Number.isNaN(eatenAt.getTime())) continue;
+    const mKey = monthKey(eatenAt);
+    let month = months.get(mKey);
+    if (!month) {
+      month = {
+        key: mKey,
+        date: new Date(eatenAt.getFullYear(), eatenAt.getMonth(), 1),
+        days: [],
+        totals: { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+      };
+      months.set(mKey, month);
+    }
+
+    const dKey = dayKey(eatenAt);
+    let day = month.days.find((item) => item.key === dKey);
+    if (!day) {
+      day = {
+        key: dKey,
+        date: new Date(
+          eatenAt.getFullYear(),
+          eatenAt.getMonth(),
+          eatenAt.getDate(),
+        ),
+        meals: [],
+        totals: { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+      };
+      month.days.push(day);
+    }
+
+    const mealTotals: MacroTotals = {
+      kcal: meal.kcal,
+      proteinG: meal.proteinG,
+      carbsG: meal.carbsG,
+      fatG: meal.fatG,
+    };
+    day.meals.push(meal);
+    day.totals = addTotals(day.totals, mealTotals);
+    month.totals = addTotals(month.totals, mealTotals);
+  }
+
+  const sorted = [...months.values()].sort(
+    (a, b) => b.date.getTime() - a.date.getTime(),
+  );
+  for (const month of sorted) {
+    month.days.sort((a, b) => b.date.getTime() - a.date.getTime());
+    for (const day of month.days) {
+      day.meals.sort(
+        (a, b) => new Date(b.eatenAt).getTime() - new Date(a.eatenAt).getTime(),
+      );
+    }
+  }
+  return sorted;
 }

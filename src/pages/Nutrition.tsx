@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { MealHistory } from '../components/MealHistory';
 import { useI18n } from '../i18n/I18nContext';
 import { intlLocale } from '../i18n/messages';
 import {
@@ -52,6 +53,10 @@ export function Nutrition() {
   );
   const [configError, setConfigError] = useState(false);
   const [configSaved, setConfigSaved] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [proteinFormOpen, setProteinFormOpen] = useState(false);
+  const [proteinGrams, setProteinGrams] = useState('');
+  const [proteinError, setProteinError] = useState(false);
 
   useEffect(() => {
     setGoal(data.profile?.goal ?? '');
@@ -235,6 +240,41 @@ export function Nutrition() {
     setData(deleteMeal(id));
   }
 
+  function addManualProtein(event: React.FormEvent) {
+    event.preventDefault();
+    const grams = Number(proteinGrams.replace(',', '.'));
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 200) {
+      setProteinError(true);
+      return;
+    }
+    const proteinG = Math.round(grams * 10) / 10;
+    // 1 g de protéine ≈ 4 kcal : on tient le journal cohérent côté calories.
+    const kcal = Math.round(proteinG * 4);
+    setData(
+      addMeal({
+        label: t('nutrition.manualProteinLabel'),
+        kcal,
+        proteinG,
+        carbsG: 0,
+        fatG: 0,
+        items: [
+          {
+            name: t('nutrition.manualProteinLabel'),
+            quantity: `${proteinG} ${t('units.g')}`,
+            kcal,
+            proteinG,
+            carbsG: 0,
+            fatG: 0,
+          },
+        ],
+        eatenAt: new Date().toISOString(),
+      }),
+    );
+    setProteinGrams('');
+    setProteinError(false);
+    setProteinFormOpen(false);
+  }
+
   function saveNutritionConfig(event: React.FormEvent) {
     event.preventDefault();
     const sessions = Number(sessionsPerWeek);
@@ -271,7 +311,22 @@ export function Nutrition() {
           <h1>{t('nutrition.title')}</h1>
           <p>{t('nutrition.subtitle')}</p>
         </div>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setHistoryOpen(true)}
+        >
+          {t('nutrition.history')}
+        </button>
       </header>
+
+      {historyOpen && (
+        <MealHistory
+          meals={data.meals}
+          targets={targets}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
 
       <section className="panel nutrition-global">
         <div className="sheet-head">
@@ -455,6 +510,60 @@ export function Nutrition() {
           </>
         ) : (
           <p className="goal-status">{t('nutrition.profileIncomplete')}</p>
+        )}
+
+        {!proteinFormOpen ? (
+          <button
+            type="button"
+            className="btn btn-protein btn-sm"
+            onClick={() => {
+              setProteinFormOpen(true);
+              setProteinError(false);
+            }}
+          >
+            {t('nutrition.addProtein')}
+          </button>
+        ) : (
+          <form className="protein-add-form" onSubmit={addManualProtein}>
+            <div className="field">
+              <label htmlFor="manual-protein">
+                {t('nutrition.addProteinAmount')}
+              </label>
+              <input
+                id="manual-protein"
+                type="number"
+                min={1}
+                max={200}
+                step={0.5}
+                autoFocus
+                value={proteinGrams}
+                onChange={(event) => {
+                  setProteinGrams(event.target.value);
+                  setProteinError(false);
+                }}
+                placeholder={t('nutrition.addProteinPlaceholder')}
+              />
+            </div>
+            <div className="row-actions">
+              <button type="submit" className="btn btn-primary btn-sm">
+                {t('nutrition.addProteinConfirm')}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setProteinFormOpen(false);
+                  setProteinGrams('');
+                  setProteinError(false);
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+            {proteinError && (
+              <p className="exchange-error">{t('nutrition.addProteinInvalid')}</p>
+            )}
+          </form>
         )}
       </section>
 

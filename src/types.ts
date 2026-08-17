@@ -8,7 +8,11 @@ export type Equipment =
   | 'poids_du_corps'
   | 'cardio'
   | 'kettlebell'
+  | 'sport'
   | 'autre';
+
+/** Intensité ressentie d'une pratique sportive, utilisée pour les calories. */
+export type SportIntensity = 'faible' | 'moderee' | 'elevee';
 
 export type MuscleGroup =
   | 'pectoraux'
@@ -22,6 +26,7 @@ export type MuscleGroup =
   | 'mollets'
   | 'core'
   | 'cardio'
+  | 'sport'
   | 'full_body';
 
 export type Exercise = {
@@ -31,6 +36,11 @@ export type Exercise = {
   equipment: Equipment;
   tracking: TrackingType;
   defaultRestSec: number;
+  /**
+   * MET de référence à intensité modérée. Renseigné pour les sports, où le
+   * matériel ne suffit pas à estimer la dépense.
+   */
+  met?: number;
   tags?: string[];
   instructions?: string[];
   /** Exercice de la sélection supplémentaire (hors bibliothèque de base). */
@@ -50,6 +60,8 @@ export type ProgramExercise = {
   /** Temps d'effort visé par série, chronométrable pendant la séance. */
   workDurationSec?: number;
   targetWeightKg?: number;
+  /** Renseignée pour les sports : ajuste les calories estimées. */
+  intensity?: SportIntensity;
   notes?: string;
 };
 
@@ -89,6 +101,7 @@ export type SetLog = {
   weightKg?: number;
   durationSec?: number;
   distanceM?: number;
+  intensity?: SportIntensity;
 };
 
 export type ExerciseLog = {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { NutritionTrend } from '../components/NutritionTrend';
 import { useI18n } from '../i18n/I18nContext';
 import { intlLocale } from '../i18n/messages';
 import {
@@ -9,22 +10,42 @@ import {
   sessionCaloriesKcal,
 } from '../lib/calories';
 import {
-  compareDayIntake,
+  compareIntake,
+  dailyMacroSeries,
   resolveDailyTargets,
+  scaleTargets,
 } from '../lib/nutritionGoals';
 import {
+  addMeal,
   addWeightEntry,
   deleteWeightEntry,
-  mealsOfDay,
   sessionDurationMin,
   sessionVolumeKg,
 } from '../lib/storage';
 import { useAppData } from '../lib/useAppData';
-import type { Locale } from '../i18n/messages';
-import type { WeightEntry } from '../types';
+import type { Locale, MessageKey } from '../i18n/messages';
+import type { DailyTargets, DayComparison } from '../lib/nutritionGoals';
+import type { AppData, WeightEntry } from '../types';
 
 const DAY_LABELS_FR = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const DAY_LABELS_HE = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
+
+type StatPeriod = 'day' | 'week' | 'month';
+
+/** Fenêtres glissantes terminant aujourd'hui. */
+const PERIOD_DAYS: Record<StatPeriod, number> = { day: 1, week: 7, month: 30 };
+const STAT_PERIODS: StatPeriod[] = ['day', 'week', 'month'];
+
+type PeriodStat = {
+  period: StatPeriod;
+  sessions: number;
+  minutes: number;
+  burnedKcal: number;
+  kcal: number;
+  proteinG: number;
+  targets: DailyTargets | null;
+  intake: DayComparison | null;
+};
 
 function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -48,19 +69,51 @@ export function Dashboard() {
   const dayLabels = locale === 'he' ? DAY_LABELS_HE : DAY_LABELS_FR;
   const numberLocale = intlLocale(locale);
 
-  const todayMeals = useMemo(
-    () => mealsOfDay(data.meals),
-    [data.meals],
-  );
   const targets = useMemo(
     () => resolveDailyTargets(data.profile, bodyWeightKg),
     [data.profile, bodyWeightKg],
   );
-  const intake = useMemo(
-    () => (targets ? compareDayIntake(todayMeals, targets) : null),
-    [todayMeals, targets],
-  );
-  const intakeToday = intake?.kcal.actual ?? todayMeals.reduce((sum, meal) => sum + meal.kcal, 0);
+
+  const periodStats = useMemo<PeriodStat[]>(() => {
+    const finished = data.sessions.filter((session) => session.endedAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return STAT_PERIODS.map((period) => {
+      const length = PERIOD_DAYS[period];
+      const from = new Date(today);
+      from.setDate(today.getDate() - (length - 1));
+      const sessions = finished.filter(
+        (session) => new Date(session.startedAt) >= from,
+      );
+      const macros = dailyMacroSeries(data.meals, length).reduce(
+        (total, day) => ({
+          kcal: total.kcal + day.totals.kcal,
+          proteinG: total.proteinG + day.totals.proteinG,
+        }),
+        { kcal: 0, proteinG: 0 },
+      );
+      const periodTargets = targets ? scaleTargets(targets, length) : null;
+
+      return {
+        period,
+        sessions: sessions.length,
+        minutes: sessions.reduce(
+          (total, session) => total + (sessionDurationMin(session) ?? 0),
+          0,
+        ),
+        burnedKcal: sessions.reduce(
+          (total, session) =>
+            total + sessionCaloriesKcal(session, bodyWeightKg),
+          0,
+        ),
+        kcal: macros.kcal,
+        proteinG: macros.proteinG,
+        targets: periodTargets,
+        intake: periodTargets ? compareIntake(macros, periodTargets) : null,
+      };
+    });
+  }, [data.sessions, data.meals, targets, bodyWeightKg]);
 
   const summary = useMemo(() => {
     const sessions = data.sessions
@@ -91,10 +144,6 @@ export function Dashboard() {
       sessions,
       days,
       weekCount: days.reduce((total, day) => total + day.sessions, 0),
-      totalMinutes: sessions.reduce(
-        (total, session) => total + (sessionDurationMin(session) ?? 0),
-        0,
-      ),
     };
   }, [data.sessions, dayLabels]);
 
@@ -142,76 +191,32 @@ export function Dashboard() {
             </Link>
           </div>
         </div>
-        <Link to="/programmes" className="btn btn-secondary">
-          {t('dashboard.managePrograms')}
-        </Link>
+        <div className="dashboard-header-actions">
+          <Link to="/programmes" className="btn btn-secondary">
+            {t('dashboard.managePrograms')}
+          </Link>
+          <Link to="/nutrition" className="btn btn-secondary">
+            {t('dashboard.manageNutrition')}
+          </Link>
+        </div>
       </header>
 
-      <section className="dashboard-stats" aria-label={t('dashboard.activity')}>
-        <article className="dashboard-stat">
-          <span>{t('dashboard.week')}</span>
-          <strong>{summary.weekCount}</strong>
-          <small>{t('dashboard.sessions').toLowerCase()}</small>
-        </article>
-        <article className="dashboard-stat">
-          <span>{t('dashboard.totalTime')}</span>
-          <strong>{summary.totalMinutes}</strong>
-          <small>{t('dashboard.totalTimeHint')}</small>
-        </article>
-        <article className="dashboard-stat">
-          <span>{t('dashboard.intake')}</span>
-          {intake && targets ? (
-            <>
-              <strong>
-                {t('dashboard.intakeProgress', {
-                  consumed: intakeToday.toLocaleString(numberLocale),
-                  goal: targets.kcal.toLocaleString(numberLocale),
-                })}
-              </strong>
-              <small>{t('units.kcal')}</small>
-              <div className="goal-track goal-track-sm">
-                <span
-                  className={intake.kcal.over ? 'goal-bar over' : 'goal-bar'}
-                  style={{ width: `${intake.kcal.percent}%` }}
-                />
-              </div>
-              <span className="dashboard-stat-protein">
-                {t('dashboard.intakeProteinProgress', {
-                  consumed: Math.round(intake.protein.actual).toLocaleString(
-                    numberLocale,
-                  ),
-                  goal: targets.proteinG.toLocaleString(numberLocale),
-                })}
-              </span>
-              <div className="goal-track goal-track-sm">
-                <span
-                  className={
-                    intake.protein.over
-                      ? 'goal-bar over'
-                      : 'goal-bar goal-bar-protein'
-                  }
-                  style={{ width: `${intake.protein.percent}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <strong>
-                {t('dashboard.intakeProgress', {
-                  consumed: intakeToday.toLocaleString(numberLocale),
-                  goal: '—',
-                })}
-              </strong>
-              <small>{t('dashboard.intakeIncomplete')}</small>
-              <Link to="/nutrition" className="dashboard-stat-link">
-                {t('dashboard.intakeSetGoal')}
-              </Link>
-            </>
-          )}
-        </article>
-      </section>
+      <DashboardCarousel
+        label={t('dashboard.periodStats')}
+        slides={periodStats.map((stat) => ({
+          id: stat.period,
+          label: t(`dashboard.period.${stat.period}`),
+          content: (
+            <PeriodStatCards
+              stat={stat}
+              onAddProtein={(grams) => setData(addManualProteinMeal(grams, t))}
+            />
+          ),
+        }))}
+      />
 
       <DashboardCarousel
+        label={t('dashboard.carousel')}
         slides={[
           {
             id: 'overview',
@@ -314,30 +319,34 @@ export function Dashboard() {
             id: 'weight',
             label: t('dashboard.weight'),
             content: (
-              <section className="panel weight-tracker">
-                <div className="dashboard-section-title">
-                  <div>
-                    <h2>{t('dashboard.weightTracking')}</h2>
-                    <p className="muted">{t('dashboard.weightHint')}</p>
+              <div className="tracking-grid">
+                <section className="panel weight-tracker">
+                  <div className="dashboard-section-title">
+                    <div>
+                      <h2>{t('dashboard.weightTracking')}</h2>
+                      <p className="muted">{t('dashboard.weightHint')}</p>
+                    </div>
+                    {data.weightEntries.at(-1) && (
+                      <strong>
+                        {data.weightEntries
+                          .at(-1)
+                          ?.weightKg.toLocaleString(numberLocale)}{' '}
+                        {t('weight.kg')}
+                      </strong>
+                    )}
                   </div>
-                  {data.weightEntries.at(-1) && (
-                    <strong>
-                      {data.weightEntries
-                        .at(-1)
-                        ?.weightKg.toLocaleString(numberLocale)}{' '}
-                      {t('weight.kg')}
-                    </strong>
-                  )}
-                </div>
-                <WeightTracker
-                  entries={data.weightEntries}
-                  newWeight={newWeight}
-                  setNewWeight={setNewWeight}
-                  error={weightError}
-                  onSubmit={recordWeight}
-                  onDelete={removeWeight}
-                />
-              </section>
+                  <WeightTracker
+                    entries={data.weightEntries}
+                    newWeight={newWeight}
+                    setNewWeight={setNewWeight}
+                    error={weightError}
+                    onSubmit={recordWeight}
+                    onDelete={removeWeight}
+                  />
+                </section>
+
+                <NutritionTrend meals={data.meals} targets={targets} />
+              </div>
             ),
           },
         ]}
@@ -410,7 +419,13 @@ type Slide = {
 
 const SLIDE_DURATION_MS = 8000;
 
-function DashboardCarousel({ slides }: { slides: Slide[] }) {
+function DashboardCarousel({
+  slides,
+  label,
+}: {
+  slides: Slide[];
+  label: string;
+}) {
   const { t } = useI18n();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -435,7 +450,7 @@ function DashboardCarousel({ slides }: { slides: Slide[] }) {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
       aria-roledescription="carrousel"
-      aria-label={t('dashboard.carousel')}
+      aria-label={label}
     >
       <div className="carousel-body" key={active.id}>
         {active.content}
@@ -468,6 +483,180 @@ function DashboardCarousel({ slides }: { slides: Slide[] }) {
       </div>
     </section>
   );
+}
+
+function PeriodStatCards({
+  stat,
+  onAddProtein,
+}: {
+  stat: PeriodStat;
+  onAddProtein: (grams: number) => void;
+}) {
+  const { locale, t } = useI18n();
+  const numberLocale = intlLocale(locale);
+  const [proteinFormOpen, setProteinFormOpen] = useState(false);
+  const [proteinGrams, setProteinGrams] = useState('');
+  const [proteinError, setProteinError] = useState(false);
+
+  function submitProtein(event: React.FormEvent) {
+    event.preventDefault();
+    const grams = Number(proteinGrams.replace(',', '.'));
+    if (!Number.isFinite(grams) || grams <= 0 || grams > 200) {
+      setProteinError(true);
+      return;
+    }
+    onAddProtein(Math.round(grams * 10) / 10);
+    setProteinGrams('');
+    setProteinError(false);
+    setProteinFormOpen(false);
+  }
+
+  return (
+    <section
+      className="dashboard-stats"
+      aria-label={t(`dashboard.periodTitle.${stat.period}`)}
+    >
+      <article className="dashboard-stat">
+        <span>{t(`dashboard.periodTitle.${stat.period}`)}</span>
+        <strong>{stat.sessions}</strong>
+        <small>{t('dashboard.sessions').toLowerCase()}</small>
+      </article>
+      <article className="dashboard-stat">
+        <span>{t('dashboard.totalTime')}</span>
+        <strong>{stat.minutes}</strong>
+        <small>{t('dashboard.totalTimeHint')}</small>
+      </article>
+      <article className="dashboard-stat">
+        <span>{t('dashboard.burned')}</span>
+        <strong>
+          {Math.round(stat.burnedKcal).toLocaleString(numberLocale)}
+        </strong>
+        <small>{t('dashboard.burnedHint')}</small>
+      </article>
+      <article className="dashboard-stat">
+        <span>{t(`dashboard.periodIntake.${stat.period}`)}</span>
+        {stat.intake && stat.targets ? (
+          <>
+            <strong>
+              {t('dashboard.intakeProgress', {
+                consumed: Math.round(stat.kcal).toLocaleString(numberLocale),
+                goal: stat.targets.kcal.toLocaleString(numberLocale),
+              })}
+            </strong>
+            <small>{t('units.kcal')}</small>
+            <div className="goal-track goal-track-sm">
+              <span
+                className={stat.intake.kcal.over ? 'goal-bar over' : 'goal-bar'}
+                style={{ width: `${stat.intake.kcal.percent}%` }}
+              />
+            </div>
+            <span className="dashboard-stat-protein">
+              {t('dashboard.intakeProteinProgress', {
+                consumed: Math.round(stat.proteinG).toLocaleString(numberLocale),
+                goal: stat.targets.proteinG.toLocaleString(numberLocale),
+              })}
+            </span>
+            <div className="goal-track goal-track-sm">
+              <span
+                className={
+                  stat.intake.protein.over
+                    ? 'goal-bar over'
+                    : 'goal-bar goal-bar-protein'
+                }
+                style={{ width: `${stat.intake.protein.percent}%` }}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <strong>
+              {t('dashboard.intakeProgress', {
+                consumed: Math.round(stat.kcal).toLocaleString(numberLocale),
+                goal: '—',
+              })}
+            </strong>
+            <small>{t('dashboard.intakeIncomplete')}</small>
+            <Link to="/nutrition" className="dashboard-stat-link">
+              {t('dashboard.intakeSetGoal')}
+            </Link>
+          </>
+        )}
+
+        {!proteinFormOpen ? (
+          <button
+            type="button"
+            className="btn btn-protein btn-sm dashboard-add-protein"
+            onClick={() => {
+              setProteinFormOpen(true);
+              setProteinError(false);
+            }}
+          >
+            {t('nutrition.addProtein')}
+          </button>
+        ) : (
+          <form className="dashboard-protein-form" onSubmit={submitProtein}>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              step={0.5}
+              autoFocus
+              value={proteinGrams}
+              onChange={(event) => {
+                setProteinGrams(event.target.value);
+                setProteinError(false);
+              }}
+              placeholder={t('nutrition.addProteinPlaceholder')}
+              aria-label={t('nutrition.addProteinAmount')}
+            />
+            <button type="submit" className="btn btn-primary btn-sm">
+              {t('nutrition.addProteinConfirm')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setProteinFormOpen(false);
+                setProteinGrams('');
+                setProteinError(false);
+              }}
+            >
+              {t('common.cancel')}
+            </button>
+            {proteinError && (
+              <p className="exchange-error">{t('nutrition.addProteinInvalid')}</p>
+            )}
+          </form>
+        )}
+      </article>
+    </section>
+  );
+}
+
+/** Entrée journaliere minimale : protéines saisies à la main. */
+function addManualProteinMeal(
+  proteinG: number,
+  t: (key: MessageKey) => string,
+): AppData {
+  const kcal = Math.round(proteinG * 4);
+  return addMeal({
+    label: t('nutrition.manualProteinLabel'),
+    kcal,
+    proteinG,
+    carbsG: 0,
+    fatG: 0,
+    items: [
+      {
+        name: t('nutrition.manualProteinLabel'),
+        quantity: `${proteinG} g`,
+        kcal,
+        proteinG,
+        carbsG: 0,
+        fatG: 0,
+      },
+    ],
+    eatenAt: new Date().toISOString(),
+  });
 }
 
 function WeightTracker({

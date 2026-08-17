@@ -245,6 +245,29 @@ const EXERCISE_NAMES_HE = {
   'ext-situp': 'סיט-אפ מלא',
   'ext-air-bike': 'קראנץ׳ אופניים',
   'ext-hanging-pike': 'הרמה בתלייה לפייק',
+
+  'sport-padel': 'פאדל',
+  'sport-tennis-single': 'טניס (יחידים)',
+  'sport-tennis-double': 'טניס (זוגות)',
+  'sport-badminton': 'בדמינטון',
+  'sport-squash': 'סקווש',
+  'sport-table-tennis': 'טניס שולחן',
+  'sport-football': 'כדורגל',
+  'sport-basketball': 'כדורסל',
+  'sport-volleyball': 'כדורעף',
+  'sport-handball': 'כדוריד',
+  'sport-rugby': 'רוגבי',
+  'sport-running': 'ריצה',
+  'sport-cycling': 'אופני כביש',
+  'sport-swimming': 'שחייה',
+  'sport-hiking': 'טיול הליכה',
+  'sport-boxing': 'אגרוף (שק / ספארינג)',
+  'sport-martial-arts': 'אומנויות לחימה',
+  'sport-climbing': 'טיפוס',
+  'sport-ski': 'סקי אלפיני',
+  'sport-dance': 'ריקוד',
+  'sport-golf': 'גולף (בהליכה)',
+  'sport-surf': 'גלישה',
 } as const satisfies Record<string, string>;
 
 export type LibraryExerciseId = keyof typeof EXERCISE_NAMES_HE;
@@ -262,6 +285,7 @@ const MUSCLE_LABELS = {
     mollets: 'Mollets',
     core: 'Core',
     cardio: 'Cardio',
+    sport: 'Sport',
     full_body: 'Full body',
   },
   he: {
@@ -276,6 +300,7 @@ const MUSCLE_LABELS = {
     mollets: 'שוקיים',
     core: 'ליבה',
     cardio: 'קרדיו',
+    sport: 'ספורט',
     full_body: 'כל הגוף',
   },
 } as const satisfies Record<Locale, Record<MuscleGroup, string>>;
@@ -289,6 +314,7 @@ const EQUIPMENT_LABELS = {
     poids_du_corps: 'Poids du corps',
     cardio: 'Cardio',
     kettlebell: 'Kettlebell',
+    sport: 'Sport en extérieur',
     autre: 'Autre',
   },
   he: {
@@ -299,6 +325,7 @@ const EQUIPMENT_LABELS = {
     poids_du_corps: 'משקל גוף',
     cardio: 'קרדיו',
     kettlebell: 'קטלבל',
+    sport: 'ספורט בחוץ',
     autre: 'אחר',
   },
 } as const satisfies Record<Locale, Record<Equipment, string>>;

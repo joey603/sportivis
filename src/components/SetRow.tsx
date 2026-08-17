@@ -7,6 +7,8 @@ type Props = {
   tracking: TrackingType;
   calories: number;
   active?: boolean;
+  /** Les sports se saisissent en minutes, les exercices de salle en secondes. */
+  durationUnit?: 'sec' | 'min';
   onChange: (next: SetLog) => void;
   onComplete: () => void;
 };
@@ -16,6 +18,7 @@ export function SetRow({
   tracking,
   calories,
   active,
+  durationUnit = 'sec',
   onChange,
   onComplete,
 }: Props) {
@@ -65,16 +68,31 @@ export function SetRow({
         <input
           type="number"
           inputMode="numeric"
-          placeholder={t('workout.sec')}
-          value={set.durationSec ?? ''}
+          placeholder={
+            durationUnit === 'min' ? t('units.min') : t('workout.sec')
+          }
+          value={
+            set.durationSec === undefined
+              ? ''
+              : durationUnit === 'min'
+                ? Math.round(set.durationSec / 60)
+                : set.durationSec
+          }
           disabled={set.completed}
           style={{ gridColumn: 'span 2' }}
-          onChange={(e) =>
+          onChange={(e) => {
+            const raw = e.target.value;
+            const value = Number(raw);
             onChange({
               ...set,
-              durationSec: e.target.value === '' ? undefined : Number(e.target.value),
-            })
-          }
+              durationSec:
+                raw === ''
+                  ? undefined
+                  : durationUnit === 'min'
+                    ? value * 60
+                    : value,
+            });
+          }}
           aria-label={t('workout.ariaDuration')}
         />
       )}

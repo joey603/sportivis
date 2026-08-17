@@ -4,6 +4,7 @@ import { CountdownTimer } from '../components/CountdownTimer';
 import { ExerciseSheet } from '../components/ExerciseSheet';
 import { ExerciseThumb } from '../components/ExerciseThumb';
 import { SetRow } from '../components/SetRow';
+import { isSportExercise } from '../data/exercises';
 import { localizeExerciseName } from '../i18n/exercises';
 import { useI18n } from '../i18n/I18nContext';
 import { loadSettings, setCaloriesKcal } from '../lib/calories';
@@ -40,6 +41,7 @@ function buildLogs(programId: string): ExerciseLog[] {
       weightKg: ex?.tracking === 'reps' ? pe.targetWeightKg : undefined,
       durationSec: pe.durationSec,
       distanceM: pe.distanceM,
+      intensity: pe.intensity,
     }));
     return {
       programExerciseId: pe.id,
@@ -400,6 +402,7 @@ export function Workout() {
                 set={set}
                 tracking={ex.tracking}
                 calories={setCaloriesKcal(set, ex, bodyWeightKg)}
+                durationUnit={isSportExercise(ex) ? 'min' : 'sec'}
                 active={
                   phase?.kind === 'work' &&
                   phase.exerciseIndex === activeIndex &&
