@@ -26,6 +26,31 @@
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   --nav-h: 64px;
+  /* Décalage sous l'encoche / l'îlot dynamique : zone sûre + petite marge. */
+  --nav-safe-gap: 0.35rem;
+  --nav-safe-top: calc(env(safe-area-inset-top, 0px) + var(--nav-safe-gap));
+}
+
+/* iOS dessine la page sous la barre d'état (status bar translucide) et renvoie
+   parfois une zone sûre nulle : on impose un décalage plancher pour que la ligne
+   logo + boutons reste sous la caméra et l'îlot dynamique, en navigateur comme
+   en application installée. `-webkit-touch-callout` restreint la règle à iOS. */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 820px) {
+    :root {
+      --nav-safe-top: max(
+        calc(env(safe-area-inset-top, 0px) + var(--nav-safe-gap)),
+        3.25rem
+      );
+    }
+  }
+}
+
+/* Sur téléphone la ligne respire un peu plus sous la zone sûre. */
+@media (max-width: 720px) {
+  :root {
+    --nav-safe-gap: 0.85rem;
+  }
 }
 
 *,
@@ -119,11 +144,11 @@ ul {
   position: sticky;
   top: 0;
   z-index: 50;
-  height: calc(var(--nav-h) + env(safe-area-inset-top, 0px));
+  height: calc(var(--nav-h) + var(--nav-safe-top));
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: env(safe-area-inset-top, 0px) max(1.25rem, env(safe-area-inset-right, 0px))
+  padding: var(--nav-safe-top) max(1.25rem, env(safe-area-inset-right, 0px))
     0 max(1.25rem, env(safe-area-inset-left, 0px));
   backdrop-filter: blur(16px);
   background: rgba(10, 22, 40, 0.75);
@@ -249,7 +274,8 @@ html[dir='rtl'] .brand {
 @media (max-width: 720px) {
   .top-nav {
     gap: 0.75rem;
-    padding: 0 1rem;
+    /* Sans le padding haut, le contenu remonterait sous l'îlot dynamique. */
+    padding: var(--nav-safe-top) 1rem 0;
   }
 
   .nav-collapsible .nav-toggle {
@@ -315,7 +341,7 @@ html[dir='rtl'] .brand {
     align-items: stretch;
     justify-content: flex-start;
     gap: 0.35rem;
-    padding: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 0.75rem)
+    padding: calc(var(--nav-h) + var(--nav-safe-top) + 0.75rem)
       max(1rem, env(safe-area-inset-inline-end, 0px))
       calc(1.5rem + env(safe-area-inset-bottom, 0px))
       max(1rem, env(safe-area-inset-inline-start, 0px));
