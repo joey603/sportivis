@@ -40,16 +40,16 @@
     :root {
       --nav-safe-top: max(
         calc(env(safe-area-inset-top, 0px) + var(--nav-safe-gap)),
-        2.25rem
+        1.25rem
       );
     }
   }
 }
 
-/* Sur téléphone la ligne respire un peu plus sous la zone sûre. */
+/* Sur téléphone la ligne colle davantage à la zone sûre. */
 @media (max-width: 720px) {
   :root {
-    --nav-safe-gap: 0.4rem;
+    --nav-safe-gap: 0.15rem;
   }
 }
 
